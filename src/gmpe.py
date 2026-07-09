@@ -1,7 +1,7 @@
 #!/usr/bin/env python -W ignore::Warning
-# signal_analysis.py 
-# Class for seismic acceleration analysis traitment 
-
+# gmpe.py
+# GMPE computation engine for RESPMAtch — wraps OpenQuake hazardlib.
+#
 # Copyright (C) 2010-2022 Maria LANCIERI
 
 # This program is free software: you can redistribute it and/or modify
@@ -15,7 +15,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import scipy as sp
