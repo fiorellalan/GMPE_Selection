@@ -10,7 +10,10 @@ GMPE_selection/
 │   ├── gmpe.py                  # Core module: GMPE computation via OpenQuake
 │   ├── gmpe_selection_gui.py    # Interactive Tkinter GUI for GMPE selection
 │   └── compute_targetspectra.py # CLI script: compute target spectra in RSPMatch format
-├── Manual/                      # HTML documentation & example images
+├── Manual/
+│   ├── gmpe_guide.html               # 📖 gmpe.py documentation
+│   ├── GMPE_selection_gui.html       # 📖 GUI guide & screenshots
+│   └── compute_targetspectra_guide.html  # 📖 compute_targetspectra.py guide
 └── README.md
 ```
 
@@ -36,6 +39,8 @@ Core class `gmmtools` that wraps OpenQuake's `hazardlib` to compute ground-motio
 | `read_gmpeinput()` | Builds OpenQuake `SitesContext`, `RuptureContext`, `DistancesContext` |
 | `computegmpe(gmpe, freq, mag, depth, Epi, vs30, ...)` | Computes mean & ±1σ spectra for a single GMPE |
 | `compute_batch(gmpe_list, freq, mag, depth, epi, vs30, ...)` | Batch‑computes multiple GMPEs, returns JSON‑serializable dict |
+
+📖 Detailed guide: [`Manual/gmpe_guide.html`](Manual/gmpe_guide.html)
 
 ### 2. `src/gmpe_selection_gui.py` — Interactive GMPE Selector
 
@@ -75,6 +80,8 @@ A full-featured Tkinter graphical application for browsing, filtering, and selec
 python src/gmpe_selection_gui.py
 python src/gmpe_selection_gui.py --catalogue gmpe_catalogue.csv
 ```
+
+📖 Detailed guide: [`Manual/GMPE_selection_gui.html`](Manual/GMPE_selection_gui.html)
 
 ### 3. `src/compute_targetspectra.py` — Target Spectrum Generator
 
@@ -122,6 +129,8 @@ The script automatically switches to the OpenQuake Python environment (`~/openqu
   "BASE_DIR": "."
 }
 ```
+
+📖 Detailed guide: [`Manual/compute_targetspectra_guide.html`](Manual/compute_targetspectra_guide.html)
 
 ## Required Dependencies
 
