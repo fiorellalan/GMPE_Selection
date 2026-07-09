@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>gmpe.py — Algorithm &amp; Parameters Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #e8ecf1 0%, #d5dce6 100%); color: #1a2332; min-height: 100vh; padding: 30px; }
+  .container { max-width: 1100px; margin: auto; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); padding: 32px 36px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.04); }
+  h1 { font-size: 28px; font-weight: 700; color: #0f172a; margin-bottom: 4px; letter-spacing: -0.3px; }
+  .subtitle { font-size: 14px; color: #64748b; margin-bottom: 24px; }
+  h2 { font-size: 19px; font-weight: 600; color: #0f172a; margin: 28px 0 12px 0; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
+  h3 { font-size: 15px; font-weight: 600; color: #1e293b; margin: 16px 0 8px 0; }
+  .card { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .card h3:first-child { margin-top: 0; }
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .card-grid { grid-template-columns: 1fr; } }
+  code { background: #f1f5f9; padding: 0.15em 0.45em; border-radius: 4px; font-size: 0.88em; font-family: "SF Mono", "Fira Code", monospace; color: #2563eb; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5; margin: 10px 0; }
+  pre .cm { color: #94a3b8; font-style: italic; }
+  pre .kw { color: #c084fc; }
+  pre .str { color: #34d399; }
+  pre .num { color: #fbbf24; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.88rem; border-radius: 8px; overflow: hidden; }
+  th, td { padding: 7px 10px; border: 1px solid #e2e8f0; text-align: left; }
+  th { background: #1e293b; color: #f1f5f9; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  tr:hover td { background: #eef2ff; }
+  ul, ol { padding-left: 1.4rem; margin: 7px 0; }
+  li { margin-bottom: 0.25rem; }
+  .alert { background: #dbeafe; border-left: 4px solid #3b82f6; padding: 10px 14px; border-radius: 6px; font-size: 0.9rem; margin: 10px 0; }
+  .alert.success { background: #d1fae5; border-left-color: #22c55e; }
+  .alert.warning { background: #fef3c7; border-left-color: #f59e0b; }
+  .badge { display: inline-block; font-size: 0.7rem; font-weight: 600; background: #3b82f6; color: white; border-radius: 40px; padding: 1px 10px; line-height: 20px; margin-left: 6px; }
+  .badge.green { background: #22c55e; }
+  .badge.orange { background: #f59e0b; }
+  .badge.purple { background: #8b5cf6; }
+  .badge.red { background: #ef4444; }
+  img { max-width: 100%; height: auto; margin: 12px 0; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .flow { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+  .flow-box { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 14px; font-size: 0.8rem; font-weight: 600; text-align: center; }
+  .flow-arrow { font-size: 1.2rem; color: #64748b; }
+  .footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1><code>gmpe.py</code></h1>
+<p class="subtitle">GMPE computation engine — OpenQuake GSIM wrapper with automatic frequency selection.
+Standalone module used by <code>compute_targetspectra.py</code>.
+The GMPE list it evaluates is prepared by the
+<a href="GMPE_selection_gui.html" style="color:#2563eb; font-weight:600;">GMPE Selection GUI</a>.</p>
+
+<!-- ============================================================
+     OVERVIEW
+     ============================================================ -->
+<h2>⚙️ Overview</h2>
+<div class="card">
+  <p>
+    <code>gmpe.py</code> provides the <strong><code>gmmtools</code></strong> class, which wraps
+    OpenQuake's <code>hazardlib.gsim</code> library. It computes ground‑motion prediction
+    equation (GMPE) spectra given a scenario (magnitude, distance, Vs30, etc.) and
+    returns mean and ±1σ spectral accelerations on a frequency grid.
+  </p>
+  <p style="margin-top:8px;">
+    <strong>Core methods:</strong></p>
+  <ul>
+    <li><code>computegmpe()</code> — compute a single GMPE spectrum</li>
+    <li><code>compute_batch()</code> — compute multiple GMPEs in batch, auto‑computing missing
+    geometry (Rjb, Rrup, width, ztor)</li>
+    <li><code>read_gmpeinput()</code> — build OpenQuake context objects from scenario parameters</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     ALGORITHM FLOW
+     ============================================================ -->
+<h2>🔬 Algorithm</h2>
+<div class="card">
+  <div class="card-grid">
+    <div>
+      <h3>Step 1 — Parameter Storage</h3>
+      <p><code>computegmpe()</code> receives scenario parameters and stores them as instance
+      attributes (mag, depth, Epi, vs30, dip, rake, Rjb, Rrup, Rx, etc.).</p>
+    </div>
+    <div>
+      <h3>Step 2 — Automatic Frequency Selection</h3>
+      <p>The GMPE's native spectral periods are read from its <code>COEFFS</code> table via
+      <code>_get_gmpe_native_periods()</code>. Only periods overlapping the user's
+      requested frequency range are kept — <strong>no extrapolation, no NaNs</strong>.</p>
+    </div>
+    <div>
+      <h3>Step 3 — Context Building</h3>
+      <p><code>read_gmpeinput()</code> creates three OpenQuake context objects:
+      <code>SitesContext</code>, <code>RuptureContext</code>, and <code>DistancesContext</code>,
+      with automatic inference of z1pt0 and z2pt5 from Vs30.</p>
+    </div>
+    <div>
+      <h3>Step 4 — Spectrum Computation</h3>
+      <p>For each SA period, <code>gmpe.get_mean_and_stddevs()</code> is called.
+      Results are exponentiated (natural‑log space → linear).</p>
+    </div>
+    <div>
+      <h3>Step 5 — Frequency Reversal Guard</h3>
+      <p>Since native periods are sorted increasingly, 1/periods gives decreasing
+      frequencies. The code detects this and reverses arrays if needed so that
+      output frequencies are monotonically increasing.</p>
+    </div>
+    <div>
+      <h3>Step 6 — Range Warning</h3>
+      <p>If the user's requested frequency range extends beyond the GMPE's native
+      range, a warning is printed and the result is truncated to the native range.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     AUTOMATIC FREQUENCY SELECTION  ★ HIGHLIGHT
+     ============================================================ -->
+<h2>⭐ Automatic Frequency Selection <span class="badge orange">Key Feature</span></h2>
+<div class="card" style="border-left: 4px solid #f59e0b;">
+  <p>The most important algorithmic detail is how <code>gmpe.py</code> determines the
+  frequencies at which to compute each GMPE:</p>
+
+  <div class="flow">
+    <div class="flow-box">User request:<br><code>freq = [0.25 … 33] Hz</code></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Convert to periods:<br><code>T = 1/f</code></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Read GMPE's<br><code>COEFFS</code> table</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Intersect<br><code>native_periods ∩ user_periods</code></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">Compute only<br>on overlapping grid</div>
+  </div>
+
+  <pre>native_periods = self._get_gmpe_native_periods(gmpe_inst)
+if native_periods is None:
+    compute_periods = 1.0 / freq       <span class="cm"># fallback</span>
+else:
+    mask = (native_periods &gt;= p_min_user) &amp; (native_periods &lt;= p_max_user)
+    compute_periods = native_periods[mask]
+    if len(compute_periods) == 0:
+        raise ValueError(<span class="str">"GMPE '...' native periods don't overlap with user range"</span>)</pre>
+
+  <div class="alert warning">
+    <strong>⚠ Why this matters:</strong> Each GMPE defines its own valid period range
+    (e.g. 0.01–10 s). Computing SA outside this range would require extrapolation
+    and produce unreliable results. The code <strong>never extrapolates</strong> — it
+    restricts computation to the intersection of user demand and GMPE capability.
+  </div>
+
+  <p><strong>Example from real runs:</strong></p>
+  <table>
+    <tr><th>Scenario</th><th>User range (Hz)</th><th>Common GMPE range (Hz)</th><th>Points</th></tr>
+    <tr><td><code>HF_SMS</code></td><td>0.2500 – 33.0000</td><td>0.2512 – 20.0000</td><td>88 / 100</td></tr>
+    <tr><td><code>LF_SMS</code></td><td>0.2500 – 33.0000</td><td>0.3333 – 20.0000</td><td>83 / 100</td></tr>
+  </table>
+  <p style="font-size:0.85rem; color:#64748b;">
+    The common frequency range is the <strong>intersection of all selected GMPEs' native ranges</strong> —
+    only frequencies supported by <em>every</em> GMPE are reported. This guarantees
+    no interpolated or extrapolated values in the mean / median / percentile curves.
+  </p>
+</div>
+
+<!-- ============================================================
+     GMPE PARAMETERS
+     ============================================================ -->
+<h2>📋 GMPE Parameters <span class="badge purple">Full Reference</span></h2>
+<div class="card">
+  <p>The <code>computegmpe()</code> method accepts the following keyword arguments.
+  Each corresponds to an attribute that is set on the <code>gmmtools</code> instance
+  and then used by <code>read_gmpeinput()</code> to populate the OpenQuake contexts.</p>
+
+  <h3>Required Parameters</h3>
+  <table>
+    <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+    <tr><td><code>gmpe</code></td><td>str</td><td>OpenQuake GSIM class name (e.g. <code>"AbrahamsonEtAl2014"</code>)</td></tr>
+    <tr><td><code>freq</code></td><td>ndarray</td><td>Target frequency array (Hz) — results are interpolated to this grid</td></tr>
+    <tr><td><code>mag</code></td><td>float</td><td>Event magnitude (Mw)</td></tr>
+    <tr><td><code>depth</code></td><td>float</td><td>Event depth (km)</td></tr>
+    <tr><td><code>Epi</code></td><td>float</td><td>Epicentral distance (km)</td></tr>
+    <tr><td><code>vs30</code></td><td>float</td><td>Time‑averaged shear‑wave velocity to 30 m (m/s)</td></tr>
+  </table>
+
+  <h3>Fault Geometry Parameters</h3>
+  <table>
+    <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>dip</code></td><td><code>90.0</code></td><td>Fault dip angle (°)</td></tr>
+    <tr><td><code>rake</code></td><td><code>0.0</code></td><td>Fault rake angle (°)</td></tr>
+    <tr><td><code>Rx</code></td><td><code>0.0</code></td><td>Horizontal distance from top of rupture (km)</td></tr>
+    <tr><td><code>Ry0</code></td><td><code>0.0</code></td><td>Horizontal distance from surface projection (km)</td></tr>
+    <tr><td><code>width</code></td><td>auto‑computed</td><td>Rupture width (km) — computed from magnitude &amp; rake if not provided</td></tr>
+    <tr><td><code>ztor</code></td><td>auto‑computed</td><td>Depth to top of rupture (km) — computed from depth, width &amp; dip</td></tr>
+    <tr><td><code>Rrup</code></td><td>auto‑computed</td><td>Closest distance to rupture (km) — <code>√(ztor² + Rjb²)</code></td></tr>
+    <tr><td><code>Rjb</code></td><td><code>Epi</code></td><td>Joyner‑Boore distance (km)</td></tr>
+  </table>
+
+  <h3>Site Parameters</h3>
+  <table>
+    <tr><th>Parameter</th><th>Inference</th><th>Description</th></tr>
+    <tr><td><code>vs30measured</code></td><td><code>= vs30</code> if None</td><td>Measured Vs30 flag</td></tr>
+    <tr><td><code>z1pt0</code></td><td>Boore et al. (2011) from Vs30</td><td>Depth to 1.0 km/s (km)</td></tr>
+    <tr><td><code>z2pt5</code></td><td>From z1pt0 or Vs30</td><td>Depth to 2.5 km/s (km)</td></tr>
+    <tr><td><code>z1pt4</code></td><td>None</td><td>Depth to 1.4 km/s (km)</td></tr>
+    <tr><td><code>backarc</code></td><td>None</td><td>Back‑arc vs fore‑arc flag (0/1)</td></tr>
+    <tr><td><code>region</code></td><td><code>0</code></td><td>Tectonic region code</td></tr>
+  </table>
+
+  <h3>Other Distance Metrics</h3>
+  <table>
+    <tr><th>Parameter</th><th>Description</th></tr>
+    <tr><td><code>repi</code></td><td>Epicentral distance (km)</td></tr>
+    <tr><td><code>rvolc</code></td><td>Distance to volcanic centre (km)</td></tr>
+    <tr><td><code>rcdpp</code></td><td>Distance to CDPP (km)</td></tr>
+    <tr><td><code>clat</code></td><td>Latitude difference (°)</td></tr>
+    <tr><td><code>clon</code></td><td>Longitude difference (°)</td></tr>
+    <tr><td><code>azimuth</code></td><td>Source‑to‑site azimuth (°)</td></tr>
+  </table>
+</div>
+
+<!-- ============================================================
+     z1pt0 / z2pt5 INFERENCE
+     ============================================================ -->
+<h2>📐 Automatic z1pt0 &amp; z2pt5 Inference</h2>
+<div class="card">
+  <p>When <code>z1pt0</code> or <code>z2pt5</code> are not explicitly provided, they are
+  automatically inferred from Vs30 using the Boore et al. (2011) relations:</p>
+  <table>
+    <tr><th>Vs30 range (m/s)</th><th>z1pt0 formula</th><th>z2pt5 formula</th></tr>
+    <tr><td>Vs30 &lt; 180</td><td><code>exp(6.745) × 0.001 km</code></td><td rowspan="3"><code>(519 + 3.595 × z1pt0_m) × 0.001 km</code><br>or <code>(519 + 3.595 × Vs30) × 0.001 km</code> if z1pt0 unavailable</td></tr>
+    <tr><td>180 ≤ Vs30 &lt; 500</td><td><code>exp(6.745 − 1.35 × ln(Vs30/180)) × 0.001 km</code></td></tr>
+    <tr><td>Vs30 ≥ 500</td><td><code>exp(5.394 − 4.48 × ln(Vs30/500)) × 0.001 km</code></td></tr>
+  </table>
+  <div class="alert">
+    <strong>💡 Note:</strong> z1pt0 and z2pt5 are the depths (in km) to the 1.0 km/s and 2.5 km/s
+    shear‑wave velocity horizons. They are <strong>required by several GMPEs</strong>
+    (e.g. Chiou &amp; Youngs 2014, Campbell &amp; Bozorgnia 2014) and significantly
+    influence the predicted ground motion at sediment sites.
+  </div>
+</div>
+
+<!-- ============================================================
+     BATCH COMPUTATION
+     ============================================================ -->
+<h2>📦 Batch Computation — <code>compute_batch()</code></h2>
+<div class="card">
+  <p>The <code>compute_batch()</code> method extends <code>computegmpe()</code> to
+  multiple GMPEs with automatic geometry inference:</p>
+  <ul>
+    <li><strong>Auto‑computation of Rjb:</strong> defaults to <code>epi</code> if not provided</li>
+    <li><strong>Auto‑computation of width:</strong> from magnitude and rake angle using
+    empirical scaling relations</li>
+    <li><strong>Auto‑computation of ztor:</strong> from depth, width and dip</li>
+    <li><strong>Auto‑computation of Rrup:</strong> from ztor and Rjb</li>
+    <li>Individual GMPE failures are caught and reported in an <code>errors</code> array
+    — one failing GMPE does not block the rest</li>
+  </ul>
+
+  <pre><span class="cm"># Example usage</span>
+tool = gmpe.gmmtools()
+result = tool.compute_batch(
+    gmpe_list=[<span class="str">"AbrahamsonEtAl2014"</span>, <span class="str">"BooreEtAl2014"</span>],
+    freq=freq_array, mag=5.6, depth=7.0, epi=0.0, vs30=980.0,
+    dip=90.0, rake=0.0
+)
+<span class="cm"># result = {"results": {"AbrahamsonEtAl2014": [mean, sig1m, sig1p, nat_freq], ...},
+#           "errors": []}</span></pre>
+
+  <p><strong>Returned dict structure per GMPE:</strong></p>
+  <table>
+    <tr><th>Key</th><th>Type</th><th>Description</th></tr>
+    <tr><td><code>mean</code></td><td>list</td><td>Mean SA (g) — one value per native frequency point</td></tr>
+    <tr><td><code>sig1m</code></td><td>list</td><td>Mean − 1σ SA (g)</td></tr>
+    <tr><td><code>sig1p</code></td><td>list</td><td>Mean + 1σ SA (g)</td></tr>
+    <tr><td><code>nat_freq</code></td><td>list</td><td>Native frequency grid (Hz) — the frequencies at which the GMPE
+    was evaluated (intersection of user range and GMPE's COEFFS range)</td></tr>
+  </table>
+</div>
+
+<!-- ============================================================
+     GMPE CATALOGUE
+     ============================================================ -->
+<h2>📇 GMPE Catalogue</h2>
+<div class="card">
+  <p>The file <code>gmpe_catalogue.csv</code> is a machine‑generated index of all
+  available OpenQuake GSIMs. Each row contains:</p>
+  <table>
+    <tr><th>Column</th><th>Description</th></tr>
+    <tr><td><code>Code</code></td><td>Full OQ GSIM class name</td></tr>
+    <tr><td><code>GMPE</code></td><td>Same as Code</td></tr>
+    <tr><td><code>Year</code></td><td>Publication year (extracted from class name)</td></tr>
+    <tr><td><code>TectonicRegion</code></td><td>Active Shallow Crust, Stable Shallow Crust, Subduction Interface, etc.</td></tr>
+    <tr><td><code>RequiresDistances</code></td><td>Space‑separated list of required distance metrics</td></tr>
+    <tr><td><code>RequiresRupture</code></td><td>Space‑separated list of required rupture parameters</td></tr>
+    <tr><td><code>RequiresSites</code></td><td>Space‑separated list of required site parameters</td></tr>
+    <tr><td><code>DefinedForIMTs</code></td><td>Space‑separated list of intensity measure types</td></tr>
+    <tr><td><code>DefinedForStdDevs</code></td><td>Space‑separated list of standard deviation types</td></tr>
+    <tr><td><code>Shortcut</code></td><td>Auto‑generated short code (e.g. <code>Ab2014</code>)</td></tr>
+  </table>
+  <p>The catalogue is auto‑generated by scanning all available GSIMs via
+  <code>gsim.get_available_gsims()</code>. If the file does not exist, it is
+  created automatically by launching the OpenQuake Python environment in a
+  subprocess.</p>
+</div>
+
+<!-- ============================================================
+     OUTPUT: TARGET SPECTRA
+     ============================================================ -->
+<h2>📄 Output: Target Spectra &amp; Reports</h2>
+<div class="card">
+  <p><code>compute_targetspectra.py</code> (which uses <code>gmpe.py</code>) generates
+  the following artefacts for each event:</p>
+  <table>
+    <tr><th>File</th><th>Content</th></tr>
+    <tr><td><code>GMPE_spectra_{HF,LF}.pdf</code></td><td>Full‑resolution log‑log plot of all GMPE spectra,
+      mean, median, q16/q84 percentiles</td></tr>
+    <tr><td><code>{event}_gmpe_report.html</code></td><td>HTML report with scenario parameters, selected GMPE list,
+      embedded spectra PNG, and full spectral values table</td></tr>
+    <tr><td><code>target_{suffix}.tgt</code></td><td>RSPMatch‑compatible target spectrum file (mean spectrum)</td></tr>
+    <tr><td><code>configs/{suffix}.json</code></td><td>Configuration JSON for downstream seed selection</td></tr>
+  </table>
+</div>
+
+<!-- ============================================================
+     EXAMPLE FIGURES
+     ============================================================ -->
+<h2>📊 Example Output Spectra</h2>
+<div class="card">
+  <p>The figures below show the GMPE spectra computed for the two reference scenarios.
+  Each curve is the mean spectrum of one GMPE; the thick black line is the
+  <strong>mean of means</strong> (used as the target spectrum for RSPMatch).</p>
+
+  <div class="card-grid">
+    <div>
+      <h3 style="margin-top:0;">HF_SMS — High‑Frequency</h3>
+      <p style="font-size:0.85rem; color:#64748b;">13 GMPEs · Mw 5.6 · depth 7 km · Vs30 980 m/s</p>
+      <img src="example_gmpe_selection_HF.png"
+           alt="GMPE Spectra HF"
+           style="width:100%;">
+    </div>
+    <div>
+      <h3 style="margin-top:0;">LF_SMS — Low‑Frequency</h3>
+      <p style="font-size:0.85rem; color:#64748b;">8 GMPEs · Mw 6.4 · depth 15 km · Vs30 980 m/s</p>
+      <img src="example_gmpe_selection_LF.png"
+           alt="GMPE Spectra LF"
+           style="width:100%;">
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     QUICK REFERENCE
+     ============================================================ -->
+<h2>🚀 Quick Reference</h2>
+<div class="card">
+<pre><span class="cm"># 1. Import</span>
+import gmpe
+tool = gmpe.gmmtools()
+
+<span class="cm"># 2. Single GMPE</span>
+mean, sig1m, sig1p, dists, zone, nat_freq = tool.computegmpe(
+    <span class="str">"BooreEtAl2014"</span>, freq, mag=5.6, depth=7.0, Epi=0.0, vs30=980.0,
+    dip=90.0, rake=0.0
+)
+
+<span class="cm"># 3. Batch (auto‑geometry)</span>
+result = tool.compute_batch(
+    gmpe_list=[<span class="str">"BooreEtAl2014"</span>, <span class="str">"ChiouYoungs2014"</span>],
+    freq=freq_array, mag=5.6, depth=7.0, epi=0.0, vs30=980.0
+)
+mean_array = result[<span class="str">"results"</span>][<span class="str">"BooreEtAl2014"</span>][0]  <span class="cm"># [mean, sig1m, sig1p, nat_freq]</span></pre>
+</div>
+
+<div class="footer">
+  RESPMAtch — gmpe.py Algorithm &amp; Parameters Guide
+</div>
+
+</div>
+</body>
+</html>

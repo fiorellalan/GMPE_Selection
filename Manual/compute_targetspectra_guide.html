@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>compute_targetspectra — User Guide</title>
+<style>
+  :root {
+    --bg: #f8f9fa; --card: #fff; --border: #dee2e6;
+    --accent: #7c3aed; --accent-light: #ede9fe;
+    --text: #1e293b; --text-muted: #64748b;
+    --green: #16a34a; --amber: #d97706;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem 1rem;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 3rem; }
+  header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
+  header p { color: var(--text-muted); font-size: 1.1rem; margin-top: 0.5rem; }
+  section { margin-bottom: 2.5rem; }
+  section h2 {
+    font-size: 1.4rem; font-weight: 600; margin-bottom: 1rem;
+    padding-bottom: 0.4rem; border-bottom: 2px solid var(--border);
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.5rem; margin-bottom: 1.2rem;
+  }
+  code {
+    background: #f1f5f9; padding: 0.15em 0.4em; border-radius: 4px;
+    font-size: 0.88em; font-family: "SF Mono", "Fira Code", monospace;
+  }
+  pre {
+    background: #0f172a; color: #e2e8f0; padding: 1.2rem; border-radius: 8px;
+    overflow-x: auto; font-size: 0.85rem; line-height: 1.5; margin: 0.8rem 0;
+  }
+  pre .cm { color: #94a3b8; font-style: italic; }
+  table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.9rem; }
+  th, td { padding: 0.6rem 0.8rem; border: 1px solid var(--border); text-align: left; }
+  th { background: #f1f5f9; font-weight: 600; }
+  .flow { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; margin: 1.5rem 0; }
+  .flow-step {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.7rem 1.2rem; text-align: center; min-width: 110px; flex: 1 0 auto;
+    font-size: 0.85rem; font-weight: 500;
+  }
+  .flow-step .num {
+    display: inline-block; width: 22px; height: 22px; line-height: 22px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 0.75rem; font-weight: 700; margin-right: 0.4rem;
+  }
+  .flow-arrow { font-size: 1.4rem; color: var(--text-muted); align-self: center; }
+  .alert {
+    padding: 0.8rem 1rem; border-radius: 6px; font-size: 0.9rem; margin: 0.8rem 0;
+  }
+  .alert-info  { background: var(--accent-light); border-left: 4px solid var(--accent); }
+  .alert-success { background: #dcfce7; border-left: 4px solid var(--green); }
+  .alert-warn  { background: #fef3c7; border-left: 4px solid var(--amber); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .script-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-left: 4px solid var(--accent); border-radius: 8px; padding: 1.2rem;
+  }
+  .script-card .title { font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .script-card .desc { color: var(--text-muted); font-size: 0.9rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin-bottom: 0.3rem; }
+  @media (max-width: 640px) {
+    body { padding: 1rem 0.5rem; }
+    header h1 { font-size: 1.6rem; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1><code>compute_targetspectra.py</code><br><code>compute_all_targetspectra.py</code></h1>
+  <p>Compute GMPE target response spectra for spectral matching —<br>
+     single-GMPE or multi-GMPE ensemble with mean / median / fractiles.</p>
+</header>
+
+<section>
+<h2>⚡ Usage</h2>
+<div class="card">
+<pre><span class="cm"># Single GMPE (e.g. AbrahamsonEtAl2014)</span>
+python compute_targetspectra.py configs/config_HF_SMS_Ab2014.json
+
+<span class="cm"># All GMPEs together (mean, median, q16, q84)</span>
+python compute_all_targetspectra.py configs/config_all_GMPE.json
+
+<span class="cm"># Generate the 'all GMPEs' config first</span>
+python generate_configs.py --all</pre>
+</div>
+</section>
+
+<section>
+<h2>🔁 Pipeline Position</h2>
+<div class="flow">
+  <div class="flow-step"><span class="num">1</span> generate_configs</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><span class="num">2</span> <strong>compute_targetspectra</strong></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><span class="num">3</span> download_seeds</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><span class="num">4</span> Matching_handle</div>
+</div>
+<div class="alert-info alert" style="margin-top:1rem;">
+  <strong>Step 2</strong> — computes the GMPE target spectrum that all downstream steps use.
+  The generated <code>.tgt</code> file is required by both <code>download_seeds.py</code> (for RotD50 comparison) and <code>Matching_handle.py</code> (as the matching target).
+</div>
+</section>
+
+<section>
+<h2>📐 The Two Scripts</h2>
+<div class="grid-2">
+  <div class="script-card">
+    <div class="title">compute_targetspectra.py</div>
+    <div class="desc">
+      <strong>Single GMPE</strong> — reads a config with one GMPE (e.g. <code>config_HF_SMS_Ab2014.json</code>), computes the target spectrum via OpenQuake, saves the <code>.tgt</code> file and a PDF figure.
+      <br><br>
+      <strong>Used with:</strong> per-GMPE configs from <code>generate_configs.py</code>.
+    </div>
+  </div>
+  <div class="script-card">
+    <div class="title">compute_all_targetspectra.py</div>
+    <div class="desc">
+      <strong>All GMPEs</strong> — reads a config listing all 15 GMPEs (<code>config_all_GMPE.json</code>), computes each one, then calculates the <strong>mean, median, q16, q84</strong> across the ensemble.
+      <br><br>
+      <strong>Used with:</strong> <code>config_all_GMPE.json</code> (generated via <code>generate_configs.py --all</code>).
+    </div>
+  </div>
+</div>
+</section>
+
+<section>
+<h2>🧩 What It Does</h2>
+<div class="card">
+  <ol>
+    <li><strong>OpenQuake environment</strong> — auto-switches to <code>~/openquake/bin/python</code> if needed (no manual <code>source activate</code> required).</li>
+    <li><strong>Reads config</strong> — loads the <code>SCENARIO</code> block: event magnitude, depth, epicentral distance, Vs30, rake, dip, and the list of GMPE names.</li>
+    <li><strong>Computes reference spectrum</strong> — Berge-Thierry (2003) for the reference + site-specific non-ergodic adjustment factor.</li>
+    <li><strong>Computes GMPE spectra</strong> — for each GMPE in the list, calls OpenQuake's GSIM library with the scenario parameters. Returns spectral acceleration (SA) at frequencies from 0.5 to 33 Hz.</li>
+    <li><strong>Generates <code>.tgt</code> file</strong> — writes the target spectrum in RSPMatch format (3 header lines, then frequency / dummy / dummy / SA per line). SA is in m/s².</li>
+    <li><strong>Generates PDF figure</strong> — log-log plot of all GMPE curves + BT2003 reference.</li>
+  </ol>
+  <p>For <code>compute_all_targetspectra.py</code>, step 4 additionally computes the ensemble <strong>mean, median, 16th and 84th percentiles</strong> across all GMPEs, and saves a separate <code>target{event}_MEAN.tgt</code>.</p>
+</div>
+</section>
+
+<!-- ───── ALGORITHM TRACE ───── -->
+<section>
+<h2>🔬 Algorithm Trace</h2>
+<p>Step-by-step logic of <code>compute_targetspectra.py</code> and <code>compute_all_targetspectra.py</code> at runtime:</p>
+
+<div class="card">
+  <h3>Phase 1 — OpenQuake environment</h3>
+  <ol>
+    <li><strong>Check Python:</strong> compare <code>sys.executable</code> against <code>~/openquake/bin/python</code>.</li>
+    <li><strong>Auto-switch:</strong> if not already running from the OpenQuake environment, call <code>os.execv()</code> to restart the script using <code>~/openquake/bin/python</code> with the same arguments. This ensures all OpenQuake GSIM libraries are available.</li>
+    <li><strong>No manual activation needed:</strong> simply run with any Python — the script self-restarts in the correct environment.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Phase 2 — Load scenario</h3>
+  <ol>
+    <li><strong>Read config JSON:</strong> load the <code>SCENARIO</code> block containing event parameters (magnitude, depth, epicentral distance, Vs30, rake, dip) and the list of GMPE names.</li>
+    <li><strong>Compute distances:</strong> R<sub>JB</sub> = Epi, R<sub>rup</sub> = √(ztor² + R<sub>JB</sub>²), width from magnitude/rake-dependent scaling relations.</li>
+    <li><strong>Build site/rupture/distances contexts:</strong> populate OpenQuake <code>SitesContext</code>, <code>RuptureContext</code>, <code>DistancesContext</code> with the scenario parameters (Vs30, magnitude, rake, dip, depths, distances).</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Phase 3 — Compute reference spectrum</h3>
+  <ol>
+    <li><strong>Berge-Thierry (2003):</strong> compute the BT2003 reference GMPE at 100 log-spaced frequencies from 0.25 to 33 Hz using the <code>magBT</code> / <code>depthBT</code> scenario parameters.</li>
+    <li><strong>Site-specific non-ergodic factor:</strong> <code>SND = 1.5 × BT2003</code> — a simplified adjustment.</li>
+    <li><strong>Site amplification factors (SMF):</strong> hardcoded frequency-dependent factors for French hard-rock sites.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Phase 4 — Compute GMPE spectra</h3>
+  <ol>
+    <li><strong>For each GMPE:</strong> loop over all GMPE names in the config's <code>GMPElist</code>.</li>
+    <li><strong>Call OpenQuake GSIM:</strong> instantiate the GSIM class from <code>openquake.hazardlib.gsim.get_available_gsims()</code>, then call <code>get_mean_and_stddevs()</code> with the site/rupture/distances contexts at each frequency.</li>
+    <li><strong>Frequency grid:</strong> 100 log-spaced frequencies from 0.5 to 33 Hz. Some GMPEs (Kotha 2020) use a custom period grid with interpolation.</li>
+    <li><strong>Collect SA:</strong> store the median spectral acceleration (in m/s²) at each frequency for each GMPE.</li>
+  </ol>
+  <p>For <code>compute_all_targetspectra.py</code>, additionally computes the <strong>mean, median, 16th and 84th percentiles</strong> across the GMPE ensemble at each frequency.</p>
+</div>
+
+<div class="card">
+  <h3>Phase 5 — Save target files</h3>
+  <ol>
+    <li><strong>Create directory:</strong> <code>Input_{event}_{code}/</code> per GMPE (e.g. <code>Input_HF_SMS_Ab2014/</code>).</li>
+    <li><strong>Write .tgt file:</strong> 3 header lines (filename, npts+flag, damping ratio) followed by one line per frequency: <code>freq  0  1000  SA</code> where SA is in m/s².</li>
+    <li><strong>For the all-GMPE script:</strong> also saves a <code>Input_{event}_MEAN/target_{event}_MEAN.tgt</code> with the ensemble mean spectrum.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Phase 6 — Generate PDF figure</h3>
+  <ol>
+    <li><strong>Log-log plot:</strong> create a figure with one subplot per event.</li>
+    <li><strong>Plot curves:</strong> BT2003 reference in black, each GMPE curve coloured by event with legend.</li>
+    <li><strong>Save:</strong> <code>Figures/Alea_{events}events.pdf</code>.</li>
+  </ol>
+</div>
+</section>
+
+<section>
+<h2>📂 Output</h2>
+<div class="card">
+  <table>
+    <tr><th>File / Directory</th><th>Content</th></tr>
+    <tr><td><code>Input_{event}_{code}/target_{event}_{code}.tgt</code></td>
+    <td>Target spectrum file in RSPMatch format. One directory per GMPE.</td></tr>
+    <tr><td><code>Input_{event}_MEAN/target_{event}_MEAN.tgt</code></td>
+    <td><em>(all_targetspectra only)</em> Mean spectrum across the GMPE ensemble.</td></tr>
+    <tr><td><code>Alea_{events}events.pdf</code></td>
+    <td>PDF figure with all GMPE curves, coloured by event.</td></tr>
+  </table>
+</div>
+
+<div class="card">
+<h3>📄 PDF Output — Concrete Examples</h3>
+<div class="file-grid">
+  <div><code>Figures/Alea_HF_SMS_LF_SMSevents.pdf</code></div>
+  <div>Both HF_SMS + LF_SMS events on a single log-log figure — all GMPE spectra, BT2003 reference, and ensemble statistics.</div>
+  <div><code>Figures/Alea_HF_SMSevents.pdf</code></div>
+  <div>HF_SMS event only — all selected GMPE curves with mean ± σ.</div>
+  <div><code>Figures/Alea_LF_SMSevents.pdf</code></div>
+  <div>LF_SMS event only.</div>
+</div>
+<p style="margin-top:0.8rem;font-size:0.9rem;color:var(--text-muted);">
+  Generated by <code>compute_targetspectra.py</code> / <code>compute_all_targetspectra.py</code>.
+  Saved under <code>Figures/</code> in the project root.
+</p>
+</div>
+
+<div class="card">
+<h3>🖼️ Example Output — GMPE Target Spectra</h3>
+<p style="margin-bottom:0.8rem;">
+  Concrete examples from <code>Figures/</code> — log-log plots comparing all selected GMPE spectra:
+</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:0.8rem;">
+  <div>
+    <a href="example_Alea_HF_SMSevents.png" target="_blank">
+      <img src="example_Alea_HF_SMSevents.png"
+           alt="HF_SMS target spectra"
+           style="width:100%;border:1px solid var(--border);border-radius:6px;cursor:zoom-in;">
+    </a>
+    <p style="margin-top:0.4rem;font-size:0.85rem;color:var(--text-muted);text-align:center;">
+      <strong>HF_SMS event</strong> (Mw 5.6, depth 7 km)
+    </p>
+  </div>
+  <div>
+    <a href="example_Alea_LF_SMSevents.png" target="_blank">
+      <img src="example_Alea_LF_SMSevents.png"
+           alt="LF_SMS target spectra"
+           style="width:100%;border:1px solid var(--border);border-radius:6px;cursor:zoom-in;">
+    </a>
+    <p style="margin-top:0.4rem;font-size:0.85rem;color:var(--text-muted);text-align:center;">
+      <strong>LF_SMS event</strong> (Mw 6.4, depth 15 km)
+    </p>
+  </div>
+</div>
+<p style="font-size:0.85rem;color:var(--text-muted);">
+  Each curve represents one GMPE's spectral acceleration prediction. The multi-GMPE ensemble plot additionally shows mean (crimson), q16/q84 fractiles (dashed), and the BT2003 reference (black). Click to enlarge.
+</p>
+</div>
+
+<div class="card">
+<h3>📂 Target Files — Example</h3>
+<pre>Input_HF_SMS_Ab2014/target_HF_SMS_Ab2014.tgt    <span class="cm">from compute_targetspectra.py config_HF_SMS_Ab2014.json</span>
+Input_HF_SMS_MEAN/target_HF_SMS_MEAN.tgt        <span class="cm">from compute_all_targetspectra.py config_all_GMPE.json</span>
+Input_LF_SMS_Ca2014/target_LF_SMS_Ca2014.tgt    <span class="cm">per-GMPE target</span></pre>
+</div>
+</section>
+
+<section>
+<h2>📄 Target File Format (.tgt)</h2>
+<div class="card">
+  <pre>target_HF_SMS_Ab2014.tgt              <span class="cm">header: filename</span>
+       100 1                            <span class="cm">npts, flag</span>
+0.050000                                <span class="cm">damping ratio (5%)</span>
+   0.500000      0 1000     0.123456e-01 <span class="cm">freq(Hz)  _  _  SA(m/s²)</span>
+   0.525347      0 1000     0.134567e-01
+   ...</pre>
+  <p>The file has 3 header lines followed by one line per frequency. Column 1 = frequency (Hz), column 4 = spectral acceleration (m/s²).</p>
+</div>
+</section>
+
+<section>
+<h2>⚙️ Scenario Parameters</h2>
+<div class="card">
+  <table>
+    <tr><th>Parameter</th><th>HF_SMS</th><th>LF_SMS</th><th>Source</th></tr>
+    <tr><td>Magnitude (Mw)</td><td>5.7</td><td>6.6</td><td><code>mag</code> / <code>magBT</code></td></tr>
+    <tr><td>Depth</td><td>16 km</td><td>14 km</td><td><code>depth</code> / <code>depthRP3</code></td></tr>
+    <tr><td>Epicentral dist.</td><td>0 km</td><td>12 km</td><td><code>Epi</code></td></tr>
+    <tr><td>Vs30</td><td>980 m/s</td><td>980 m/s</td><td>rock site</td></tr>
+    <tr><td>Rake</td><td>0° (SS)</td><td>0° (SS)</td><td>strike-slip</td></tr>
+    <tr><td>Dip</td><td>90°</td><td>90°</td><td>vertical</td></tr>
+    <tr><td>Rx / Ry0</td><td>−1 / 0</td><td>−1 / 0</td><td>not used</td></tr>
+  </table>
+</div>
+</section>
+
+<section>
+<h2>🧮 GMPE Catalogue</h2>
+<div class="card">
+  <table>
+    <tr><th>Code</th><th>Full Name</th></tr>
+    <tr><td>Ca2014FV</td><td>Cauzzi et al. 2014 (Fixed Vs30)</td></tr>
+    <tr><td>CY2014</td><td>Chiou &amp; Youngs 2014</td></tr>
+    <tr><td>RE2019M</td><td>Rietbrock &amp; Edwards 2019 Mean</td></tr>
+    <tr><td>Am2017Rjb</td><td>Ameri et al. 2017 (R<sub>JB</sub>)</td></tr>
+    <tr><td>Bo2014</td><td>Boore et al. 2014</td></tr>
+    <tr><td>Ko2020ESHM20</td><td>Kotha et al. 2020 (ESHM20)</td></tr>
+    <tr><td>Ab2014</td><td>Abrahamson et al. 2014</td></tr>
+    <tr><td>CB2014</td><td>Campbell &amp; Bozorgnia 2014</td></tr>
+    <tr><td>Bi2014Rhyp</td><td>Bindi et al. 2014 (R<sub>hyp</sub>)</td></tr>
+    <tr><td>Ak2014</td><td>Akkar et al. 2014 (R<sub>hyp</sub>)</td></tr>
+    <tr><td>La2019RupOmo</td><td>Lanzano et al. 2019 (R<sub>rup</sub>, Omo)</td></tr>
+    <tr><td>Bi2017Rhypo</td><td>Bindi et al. 2017 (R<sub>hypo</sub>)</td></tr>
+    <tr><td>YA2015BSSSA</td><td>Yenier &amp; Atkinson 2015 (BSSA)</td></tr>
+    <tr><td>To2002SHARE</td><td>Toro et al. 2002 (SHARE)</td></tr>
+    <tr><td>Ca2003SHARE</td><td>Campbell 2003 (SHARE)</td></tr>
+  </table>
+</div>
+</section>
+
+<section>
+<h2>🔐 OpenQuake Environment</h2>
+<div class="card">
+  <p>Both scripts automatically switch to the OpenQuake Python environment if needed:</p>
+  <pre><span class="cm"># At the top of each script:</span>
+if sys.executable != "~/openquake/bin/python":
+    try:
+        import openquake
+    except ImportError:
+        os.execv("~/openquake/bin/python", [...] + sys.argv)</pre>
+  <p>No manual <code>source activate</code> needed. Simply run with your system Python and it self-restarts in the correct environment.</p>
+  <div class="alert-warn alert">
+    <strong>⚠</strong> The environment at <code>~/openquake/</code> must have <code>openquake.engine</code>, <code>scipy</code>, <code>numpy</code>, <code>matplotlib</code> installed.
+  </div>
+</div>
+</section>
+
+<section>
+<h2>🎯 Workflow</h2>
+<div class="card">
+  <pre><span class="cm"># 1. Generate configs (one per GMPE + one 'all')</span>
+python generate_configs.py --all
+
+<span class="cm"># 2. Compute single-GMPE target (for one config)</span>
+python compute_targetspectra.py configs/config_HF_SMS_Ab2014.json
+
+<span class="cm"># 3. Or compute all-GMPE ensemble</span>
+python compute_all_targetspectra.py configs/config_all_GMPE.json
+
+<span class="cm"># 4. Verify output</span>
+ls Input_HF_SMS_Ab2014/target_HF_SMS_Ab2014.tgt
+ls Input_HF_SMS_MEAN/</pre>
+</div>
+</section>
+
+<footer style="text-align:center;color:var(--text-muted);font-size:0.85rem;border-top:1px solid var(--border);padding-top:1.5rem;margin-top:2rem;">
+  RSPMatch spectral matching workflow · OpenQuake GMPEs · ESM v3.0
+</footer>
+
+</div>
+</body>
+</html>

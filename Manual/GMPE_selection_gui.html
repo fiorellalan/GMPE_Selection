@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GMPE Selection GUI — User Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #e8ecf1 0%, #d5dce6 100%); color: #1a2332; min-height: 100vh; padding: 30px; }
+  .container { max-width: 1100px; margin: auto; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); padding: 32px 36px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.04); }
+  h1 { font-size: 28px; font-weight: 700; color: #0f172a; margin-bottom: 4px; letter-spacing: -0.3px; }
+  .subtitle { font-size: 14px; color: #64748b; margin-bottom: 24px; }
+  h2 { font-size: 19px; font-weight: 600; color: #0f172a; margin: 28px 0 12px 0; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
+  h3 { font-size: 15px; font-weight: 600; color: #1e293b; margin: 16px 0 8px 0; }
+  .card { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .card h3 { margin-top: 0; }
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .card-grid { grid-template-columns: 1fr; } }
+  code { background: #f1f5f9; padding: 0.15em 0.45em; border-radius: 4px; font-size: 0.88em; font-family: "SF Mono", "Fira Code", monospace; color: #2563eb; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 18px; border-radius: 8px; overflow-x: auto; font-size: 0.82rem; line-height: 1.5; margin: 10px 0; }
+  pre .cm { color: #94a3b8; font-style: italic; }
+  pre .kw { color: #c084fc; }
+  pre .str { color: #34d399; }
+  pre .num { color: #fbbf24; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.88rem; border-radius: 8px; overflow: hidden; }
+  th, td { padding: 7px 10px; border: 1px solid #e2e8f0; text-align: left; }
+  th { background: #1e293b; color: #f1f5f9; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.3px; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  tr:hover td { background: #eef2ff; }
+  ul, ol { padding-left: 1.4rem; margin: 7px 0; }
+  li { margin-bottom: 0.25rem; }
+  .alert { background: #dbeafe; border-left: 4px solid #3b82f6; padding: 10px 14px; border-radius: 6px; font-size: 0.9rem; margin: 10px 0; }
+  .alert.success { background: #d1fae5; border-left-color: #22c55e; }
+  .alert.warning { background: #fef3c7; border-left-color: #f59e0b; }
+  .badge { display: inline-block; font-size: 0.7rem; font-weight: 600; background: #3b82f6; color: white; border-radius: 40px; padding: 1px 10px; line-height: 20px; margin-left: 6px; }
+  .badge.green { background: #22c55e; }
+  .badge.orange { background: #f59e0b; }
+  .badge.purple { background: #8b5cf6; }
+  img { max-width: 100%; height: auto; margin: 12px 0; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .step { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+  .step-num { flex-shrink: 0; width: 32px; height: 32px; background: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+  .step-body { flex: 1; }
+  .step-body p { margin: 2px 0; }
+  .footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🧩 GMPE Selection GUI</h1>
+<p class="subtitle">Interactive graphical tool for browsing, filtering, and selecting GMPEs — <code>gmpe_selection_gui.py</code></p>
+
+<!-- ============================================================
+     OVERVIEW
+     ============================================================ -->
+<h2>📋 Overview</h2>
+<div class="card">
+  <p>
+    The <strong>GMPE Selection GUI</strong> is a Tkinter-based graphical application that lets you
+    browse the full <strong>OpenQuake GSIM catalogue</strong> (300+ GMPEs), filter them by
+    tectonic region, distance metrics, site parameters, and more, then save your selection
+    as a JSON file for downstream use in <code>compute_targetspectra.py</code>.
+  </p>
+  <p style="margin-top: 8px;">
+    <strong>Usage:</strong> <code>python src/gmpe_selection_gui.py</code> or
+    <code>python src/gmpe_selection_gui.py --catalogue gmpe_catalogue.csv</code>
+  </p>
+  <div class="alert warning">
+    <strong>🔗 GM dependency:</strong> The JSON selection produced by this GUI is consumed by
+    <code>compute_targetspectra.py</code>, which relies on
+    <a href="gmpe_guide.html" style="color:#2563eb; font-weight:600;"><code>gmpe.py</code></a>
+    for all GMPE spectrum computations. The GUI itself is a <em>selection tool only</em> —
+    it does not compute spectra. See the
+    <a href="gmpe_guide.html" style="color:#2563eb; font-weight:600;">gmpe.py Algorithm Guide</a>
+    for details on how the selected GMPEs are evaluated.
+  </div>
+</div>
+
+<!-- ============================================================
+     STARTUP WIZARD
+     ============================================================ -->
+<h2>🚀 Startup Wizard</h2>
+<div class="card">
+  <p>When launched, the application presents a <strong>three‑option wizard</strong> before the main window appears:</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>📂 Load existing selection from file</strong>
+      <p>Opens a file dialog to load a previously saved <code>*.json</code> selection.
+      The loaded GMPEs populate the <em>Selected</em> panel directly — useful when
+      you already have a selection ready and want to review or modify it.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>🎯 Interactive selection (guided questions)</strong>
+      <p>Opens a step‑by‑step questionnaire dialog (see below). After answering all
+      questions, the tool applies your criteria as filters and pre‑populates the
+      selection with matched GMPEs. This is the recommended workflow for new projects.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Skip — start with default filters</strong>
+      <p>Opens the main window with empty selections and default filter values. Everything
+      is manual — no automated pre‑population.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     GUIDED QUESTIONS DIALOG
+     ============================================================ -->
+<h2>❓ Guided Questions Dialog</h2>
+<div class="card">
+  <p>The guided questionnaire collects seven filter criteria:</p>
+  <div class="card-grid">
+    <div>
+      <h3>0. Event / Project Name</h3>
+      <p>Free‑text name used for the output filename.</p>
+    </div>
+    <div>
+      <h3>1. Publication Year Range</h3>
+      <p>Min and max publication year (e.g. 2014 – present).</p>
+    </div>
+    <div>
+      <h3>2. Tectonic Region</h3>
+      <p>Checkboxes for region types (Active Shallow Crust, Stable Shallow Crust,
+      Subduction Interface, etc.). Substring match.</p>
+    </div>
+    <div>
+      <h3>3. Required Distance Metrics</h3>
+      <p><em>At least one</em> must be supported. Defaults: <code>rjb</code>, <code>rhypo</code>, <code>rrup</code>.</p>
+    </div>
+    <div>
+      <h3>4. Required Site Parameters</h3>
+      <p><em>All</em> must be supported. Default: <code>vs30</code>.</p>
+    </div>
+    <div>
+      <h3>5. Intensity Measure Types</h3>
+      <p><em>All</em> must be supported. Defaults: <code>SA</code>, <code>PGA</code>, <code>PGV</code>.</p>
+    </div>
+    <div>
+      <h3>6. Standard Deviation Types</h3>
+      <p><em>All</em> must be supported. Default: <code>Total</code>.</p>
+    </div>
+  </div>
+
+  <div class="alert">
+    <strong>💡 Tip:</strong> The defaults are pre‑tuned for the RESPMAtch workflow:
+    active / stable crust, <strong>Rjb / Rhypo / Rrup</strong> distances,
+    <strong>Vs30</strong> site parameter, <strong>SA, PGA, PGV</strong> intensity measures,
+    and <strong>Total</strong> standard deviation.
+  </div>
+</div>
+
+<!-- ============================================================
+     COUNTRY & FAMILY DIALOGS
+     ============================================================ -->
+<h2>🌍 Country &amp; Family Variant Dialogs</h2>
+<div class="card">
+  <p>After the guided questions, two additional dialogs help refine the candidate list:</p>
+
+  <div class="card-grid">
+    <div>
+      <h3>🌍 Region-Specific GMPEs</h3>
+      <p>Detects GMPEs containing country keywords (Japan, China, Taiwan, Turkey,
+      Italy, California, etc.) and asks whether they are relevant to your project.
+      GMPEs for irrelevant regions are removed.</p>
+    </div>
+    <div>
+      <h3>📦 GMPE Family Variants</h3>
+      <p>Groups GMPEs by family (same base name before the year). For families with
+      multiple variants, you may keep all, remove all, or pick specific ones.
+      Example: the <code>AbrahamsonEtAl2014</code> family has variants
+      <code>RegCHN</code>, <code>RegJPN</code>, <code>RegTWN</code>, <code>NSHMPLower</code>, <code>NSHMPMean</code>, <code>NSHMPUpper</code>.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MAIN UI
+     ============================================================ -->
+<h2>🖥️ Main Window Layout</h2>
+<div class="card">
+  <p>The main window is split into three logical zones:</p>
+
+  <table>
+    <tr><th style="width:25%;">Zone</th><th>Description</th></tr>
+    <tr>
+      <td><strong>📌 Left — Filters Panel</strong></td>
+      <td>Scrollable panel with six filter groups:
+        <ul>
+          <li><strong>Year Range</strong> — min / max publication year</li>
+          <li><strong>Tectonic Region</strong> — checkboxes (substring match)</li>
+          <li><strong>Required Distances</strong> — <em>any</em> of the selected</li>
+          <li><strong>Required Site Parameters</strong> — <em>all</em> must be supported</li>
+          <li><strong>Required Rupture Parameters</strong> — <em>all</em> must be supported</li>
+          <li><strong>IMT Types</strong> and <strong>StdDev Types</strong> — <em>all</em> must be supported</li>
+        </ul>
+        Filters apply automatically with a 200 ms debounce.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>🔄 Centre — Dual‑Pane Transfer</strong></td>
+      <td>
+        <strong>Available GMPEs</strong> (left tree) → <strong>Selected GMPEs</strong> (right tree).
+        Select items and use the arrow buttons, double‑click, or right‑click context menu.
+        A search box filters the available list by name / code.
+        An <em>Add by name</em> entry allows quick substring matching.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>📖 Bottom — Detail Panel</strong></td>
+      <td>Click any GMPE in either list to see its full metadata in a readable text view:
+        year, tectonic region, required distances, site parameters, rupture parameters,
+        IMT coverage, standard deviation types, and a human‑readable description.
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- ============================================================
+     OUTPUT: JSON FILE
+     ============================================================ -->
+<h2>📄 Output: GMPE Selection JSON</h2>
+<div class="card">
+  <p>Each selection is saved as a JSON file containing <code>[shortcut, full_OQ_name]</code> pairs
+  organised by event key. Example from <code>GMPE_selection.json</code>:</p>
+
+<pre>{
+  "LF_SMS": [
+    ["Ab2014",  "AbrahamsonEtAl2014"],
+    ["Ak2014",  "AkkarEtAlRhyp2014"],
+    ["Bi2014Rhyp","BindiEtAl2014Rhyp"],
+    ["CB2014",  "CampbellBozorgnia2014"],
+    …
+  ],
+  "HF_SMS": [
+    ["Ak2014",  "AkkarEtAlRhyp2014"],
+    ["Ak2014",  "AkkarEtAlRjb2014"],
+    ["Bo2014",  "BooreEtAl2014"],
+    ["Bo2020",  "BooreEtAl2020"],
+    ["CB2014",  "CampbellBozorgnia2014"],
+    ["CY2014",  "ChiouYoungs2014"],
+    …
+  ]
+}</pre>
+
+  <div class="alert success">
+    <strong>✅ This file is consumed by</strong> <code>compute_targetspectra.py</code>,
+    which reads the GMPE list for each event, computes the target spectra via
+    <a href="gmpe_guide.html" style="color:#2563eb; font-weight:600;"><code>gmpe.py</code></a>,
+    and generates the GMPE spectra report.
+  </div>
+</div>
+
+<!-- ============================================================     GMPE CATALOGUE GENERATION
+     ============================================================ -->
+<h2>📇 GMPE Catalogue &amp; <code>gmpe.py</code> Dependence</h2>
+<div class="card">
+  <p>
+    The catalogue CSV (<code>gmpe_catalogue.csv</code>) is auto‑generated by scanning all
+    available GSIMs via OpenQuake's <code>gsim.get_available_gsims()</code>. If the file
+    is missing, <code>gmpe_selection_gui.py</code> spawns the OpenQuake Python environment
+    to rebuild it.
+  </p>
+  <p style="margin-top:8px;">
+    <strong>Important:</strong> The GUI itself does <em>not</em> compute spectra — it only
+    manages the list of selected GMPEs. The actual computation is delegated to
+    <a href="gmpe_guide.html" style="color:#2563eb; font-weight:600;"><code>gmpe.py</code></a>
+    (the <code>gmmtools</code> class), which wraps OpenQuake's hazardlib. See the
+    <a href="gmpe_guide.html" style="color:#2563eb; font-weight:600;">gmpe.py Algorithm Guide</a>
+    for the full computation details, including automatic frequency selection and
+    parameter inference.
+  </p>
+</div>
+
+<!-- ============================================================     EXAMPLE OUTPUT PLOTS
+     ============================================================ -->
+<h2>📊 Example Output — GMPE Spectra</h2>
+<div class="card">
+  <p>The following figures illustrate the GMPE selection results for the two
+  reference scenarios (<strong>HF_SMS</strong> and <strong>LF_SMS</strong>).
+  The mean, median, and ±1σ percentiles are computed across all selected GMPEs.</p>
+
+  <div class="card-grid">
+    <div>
+      <h3 style="margin-top:0;">HF_SMS — High‑Frequency Event</h3>
+      <p style="font-size:0.85rem; color:#64748b;">13 GMPEs · Mw 5.6 · depth 7 km · Vs30 980 m/s</p>
+      <img src="example_gmpe_selection_HF.png"
+           alt="GMPE Spectra HF"
+           style="width:100%;">
+    </div>
+    <div>
+      <h3 style="margin-top:0;">LF_SMS — Low‑Frequency Event</h3>
+      <p style="font-size:0.85rem; color:#64748b;">8 GMPEs · Mw 6.4 · depth 15 km · Vs30 980 m/s</p>
+      <img src="example_gmpe_selection_LF.png"
+           alt="GMPE Spectra LF"
+           style="width:100%;">
+    </div>
+  </div>
+
+  <p style="margin-top:10px;">Additional full‑resolution PDF reports are auto‑generated by
+  <code>compute_targetspectra.py</code>:</p>
+  <ul>
+    <li><code>GMPE_spectra_HF.pdf</code> and <code>GMPE_spectra_LF.pdf</code></li>
+    <li><code>HF_SMS_gmpe_report.html</code> and <code>LF_SMS_gmpe_report.html</code></li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     SHORTCUT CODES
+     ============================================================ -->
+<h2>🏷️ GMPE Shortcut Code Convention</h2>
+<div class="card">
+  <p>The GUI automatically generates short codes for each GMPE using the rule:</p>
+  <ul>
+    <li>Extract the <strong>first letter of each capitalised word</strong> before the year</li>
+    <li>Append the <strong>4‑digit year</strong></li>
+    <li>Append any <strong>variant suffix</strong> after the year</li>
+  </ul>
+  <table>
+    <tr><th>Full Name</th><th>Shortcut</th></tr>
+    <tr><td>AbrahamsonEtAl2014</td><td><code>Ab2014</code></td></tr>
+    <tr><td>BooreEtAl2014</td><td><code>Bo2014</code></td></tr>
+    <tr><td>CampbellBozorgnia2014</td><td><code>CB2014</code></td></tr>
+    <tr><td>ChiouYoungs2014</td><td><code>CY2014</code></td></tr>
+    <tr><td>AkkarEtAlRjb2014</td><td><code>Ak2014</code></td></tr>
+    <tr><td>KothaEtAl2020Site</td><td><code>Ko2020Site</code></td></tr>
+    <tr><td>AbrahamsonEtAl2014RegJPN</td><td><code>Ab2014RegJPN</code></td></tr>
+  </table>
+</div>
+
+<!-- ============================================================
+     WORKFLOW INTEGRATION
+     ============================================================ -->
+<h2>🔗 Workflow Integration</h2>
+<div class="card">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Run the GUI</strong>
+      <p><code>python src/gmpe_selection_gui.py</code></p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Use the wizard</strong> (recommended) or load an existing selection.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Refine</strong> with the interactive filters until the GMPE list matches your needs.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <strong>Save</strong> → creates <code>gmpe_selection.json</code> (or a custom filename).
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <strong>Compute target spectra</strong> — <code>compute_targetspectra.py</code> reads the JSON
+      and uses <a href="gmpe_guide.html" style="color:#2563eb; font-weight:600;"><code>gmpe.py</code></a>
+      to evaluate all selected GMPEs, then generates the GMPE spectra reports (HTML + PDF) and the
+      <code>.tgt</code> target spectrum file.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <strong>Review</strong> the reports, then proceed to seed accelerogram selection
+      (<code>download_seeds.py</code>) and spectral matching (<code>rspm09</code>).
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  RESPMAtch — GMPE Selection GUI Guide
+</div>
+
+</div>
+</body>
+</html>
