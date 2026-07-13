@@ -1198,7 +1198,7 @@ class GMPESelectionGUI:
             activeForeground=COLORS["fg"],
         )
         _FONT_FAMILY = "Segoe UI" if _pltfrm.system() == "Windows" else "Helvetica"
-        self.root.option_add("*Font", _FONT_FAMILY + " 11")
+        self.root.option_add("*Font", "{%s} 11" % _FONT_FAMILY)
         self.root.option_add("*Background", COLORS["bg"])
         self.root.option_add("*Foreground", COLORS["fg"])
         self.root.option_add("*SelectBackground", COLORS["select_bg"])

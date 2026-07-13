@@ -999,15 +999,57 @@ def _ensure_catalogue(catalogue_path):
         return
     print(f"  ⚠ Catalogue '{catalogue_path}' not found — generating (this may take a moment)...")
 
+    import subprocess as _sp
+    import tempfile as _tf
+
+    # Locate a Python interpreter that has OpenQuake installed
     _OQ_PYTHON = os.path.expanduser("~/openquake/bin/python")
+    _FALLBACK_PYTHON = sys.executable  # current interpreter
 
-    # If not in the OpenQuake environment, delegate to a subprocess.
-    if not sys.executable.startswith(os.path.expanduser("~/openquake")):
-        print(f"🔁 Launching catalogue generator in OpenQuake environment...")
-        import subprocess as _sp
-        import tempfile as _tf
+    # Check which Python to use: prefer dedicated OQ env, fall back to current
+    _PYTHON_TO_USE = None
+    if os.path.exists(_OQ_PYTHON):
+        _PYTHON_TO_USE = _OQ_PYTHON
+        print(f"  → Using OpenQuake Python: {_OQ_PYTHON}")
+    else:
+        # Check if current interpreter has openquake installed
+        _check_code = "import openquake.hazardlib; print('OK')"
+        try:
+            _sp.run([_FALLBACK_PYTHON, "-c", _check_code],
+                    capture_output=True, text=True, timeout=15, check=True)
+            _PYTHON_TO_USE = _FALLBACK_PYTHON
+            print(f"  → Using current Python (openquake available): {_FALLBACK_PYTHON}")
+        except Exception:
+            pass
 
-        # Write a self-contained helper script to a temp file
+    if _PYTHON_TO_USE is None:
+        # Try common fallback paths
+        _ALT_PATHS = [
+            "/usr/bin/python3",
+            "/usr/local/bin/python3",
+        ]
+        for _p in _ALT_PATHS:
+            if os.path.exists(_p):
+                try:
+                    _sp.run([_p, "-c", _check_code],
+                            capture_output=True, text=True, timeout=15, check=True)
+                    _PYTHON_TO_USE = _p
+                    print(f"  → Using fallback Python: {_p}")
+                    break
+                except Exception:
+                    continue
+
+    if _PYTHON_TO_USE is None:
+        print(f"  ❌ Cannot find a Python interpreter with OpenQuake installed.")
+        print(f"     Please install OpenQuake or create the catalogue manually.")
+        print(f"     Searched locations:")
+        print(f"       • {_OQ_PYTHON}")
+        print(f"       • {_FALLBACK_PYTHON} (current)")
+        for _p in _ALT_PATHS:
+            print(f"       • {_p}")
+        return
+
+    # Write a self-contained helper script to a temp file
         _helper = _tf.NamedTemporaryFile(mode="w", suffix=".py", delete=False, prefix="oq_gen_")
         _helper.write("import csv, re, sys\n")
         _helper.write("from openquake.hazardlib import gsim\n\n")
@@ -1059,7 +1101,7 @@ def _ensure_catalogue(catalogue_path):
         _helper.write("sys.stdout.flush()\n")
         _helper.close()
 
-        _result = _sp.run([_OQ_PYTHON, _helper.name], capture_output=True, text=True, timeout=180)
+        _result = _sp.run([_PYTHON_TO_USE, _helper.name], capture_output=True, text=True, timeout=180)
         os.unlink(_helper.name)
 
         if _result.returncode == 0:
@@ -1070,7 +1112,7 @@ def _ensure_catalogue(catalogue_path):
             print(f"  ❌ OpenQuake catalogue generation failed:")
             for line in _result.stderr.strip().splitlines():
                 print(f"     {line}")
-            print(f"     → Create '{catalogue_path}' manually or run from OQ environment.")
+            print(f"     → Create '{catalogue_path}' manually or install OpenQuake.")
         return
 
     # ── We are inside OpenQuake Python — generate the catalogue ──
@@ -1162,7 +1204,7 @@ class GMPESelectionGUI:
             activeForeground=COLORS["fg"],
         )
         _FONT_FAMILY = "DejaVu Sans" if _pltfrm.system() == "Linux" else "Helvetica"
-        self.root.option_add("*Font", _FONT_FAMILY + " 11")
+        self.root.option_add("*Font", "{%s} 11" % _FONT_FAMILY)
         self.root.option_add("*Background", COLORS["bg"])
         self.root.option_add("*Foreground", COLORS["fg"])
         self.root.option_add("*SelectBackground", COLORS["select_bg"])
