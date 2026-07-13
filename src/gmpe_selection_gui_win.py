@@ -1001,16 +1001,15 @@ def _find_oq_python():
     if os.path.exists(_oq_path):
         print(f"  → Using OpenQuake Python: {_oq_path}")
         return _oq_path
-    # Check if current interpreter has openquake
-    _check_code = "import openquake.hazardlib; print('OK')"
+    # Check if the CURRENT interpreter has openquake (direct import, no subprocess)
     try:
-        _sp.run([sys.executable, "-c", _check_code],
-                capture_output=True, text=True, timeout=15, check=True)
+        import openquake.hazardlib  # noqa: F401
         print(f"  → Using current Python (openquake available): {sys.executable}")
         return sys.executable
-    except Exception:
-        pass
-    # Try common fallback paths
+    except Exception as _ex:
+        print(f"  ⚠ Current Python does NOT have openquake: {_ex}")
+    # Try common fallback paths via subprocess
+    _check_code = "import openquake.hazardlib; print('OK')"
     for _p in [
         os.path.expanduser("~/anaconda3/python.exe"),
         os.path.expanduser("~/miniconda3/python.exe"),
@@ -1023,7 +1022,8 @@ def _find_oq_python():
                         capture_output=True, text=True, timeout=15, check=True)
                 print(f"  → Using fallback Python: {_p}")
                 return _p
-            except Exception:
+            except Exception as _ex2:
+                print(f"  ⚠ Fallback {_p} failed: {_ex2}")
                 continue
     return None
 
@@ -1050,72 +1050,71 @@ def _ensure_catalogue(catalogue_path):
         print(f"       • C:\\Python311\\python.exe")
         print(f"       • C:\\Python310\\python.exe")
         return
+    # Write a self-contained helper script to a temp file
+    _helper = _tf.NamedTemporaryFile(mode="w", suffix=".py", delete=False, prefix="oq_gen_")
+    _helper.write("import csv, re, sys\n")
+    _helper.write("from openquake.hazardlib import gsim\n\n")
+    _helper.write("def _mc(name):\n")
+    _helper.write("    m=re.search(r'(\\d{4})',name)\n")
+    _helper.write("    if not m: return name\n")
+    _helper.write("    yr=m.group(1); ap=name[:m.start()]; sf=name[m.end():]\n")
+    _helper.write("    if 'EtAl' in ap:\n")
+    _helper.write("        code=ap.split('EtAl')[0][:2]\n")
+    _helper.write("    else:\n")
+    _helper.write("        parts=re.findall(r'[A-Z][a-z]*',ap)\n")
+    _helper.write("        code=''.join(p[0] for p in parts if p)\n")
+    _helper.write("    return code+yr+sf\n\n")
+    _helper.write("def _desc(cls):\n")
+    _helper.write("    doc=(cls.__doc__ or '').strip()\n")
+    _helper.write("    para=doc.split(chr(10)*2)[0] if chr(10)*2 in doc else doc\n")
+    _helper.write("    lines=[l.strip() for l in para.split(chr(10)) if l.strip()]\n")
+    _helper.write("    s=' '.join(lines).replace('\\t',' ')\n")
+    _helper.write("    return s[:1997]+'...' if len(s)>2000 else s\n\n")
+    _helper.write("rows=[]\n")
+    _helper.write("for key,cls in sorted(gsim.get_available_gsims().items(),key=lambda x:x[0]):\n")
+    _helper.write("    try:\n")
+    _helper.write("        inst=cls()\n")
+    _helper.write("        m=re.search(r'(\\d{4})',key)\n")
+    _helper.write("        yr=int(m.group(1)) if m else 0\n")
+    _helper.write("        reg=inst.DEFINED_FOR_TECTONIC_REGION_TYPE\n")
+    _helper.write("        rs=reg.value if reg else '\\u2014'\n")
+    _helper.write("        imts=inst.DEFINED_FOR_INTENSITY_MEASURE_TYPES\n")
+    _helper.write("        imt_str=' '.join(sorted(i.__name__.upper() for i in imts)) if imts else ''\n")
+    _helper.write("        stds_tmp=inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES\n")
+    _helper.write("        std_str=' '.join(sorted(stds_tmp)) if stds_tmp else ''\n")
+    _helper.write("        dists=' '.join(sorted(inst.REQUIRES_DISTANCES))\n")
+    _helper.write("        rupts=' '.join(sorted(inst.REQUIRES_RUPTURE_PARAMETERS))\n")
+    _helper.write("        sites=' '.join(sorted(inst.REQUIRES_SITES_PARAMETERS))\n")
+    _helper.write("        sc=_mc(key)\n")
+    _helper.write("        desc=_desc(cls)\n")
+    _helper.write("    except Exception:\n")
+    _helper.write("        yr,rs,imt_str,std_str,dists,rupts,sites,sc,desc=0,'\\u2014','','','','','','',''\n")
+    _helper.write("    rows.append((key,yr,rs,dists,rupts,sites,imt_str,std_str,sc,desc))\n")
+    _helper.write("_CAT = %r\n" % catalogue_path)
+    _helper.write("with open(_CAT,'w',newline='') as f:\n")
+    _helper.write("    w=csv.writer(f)\n")
+    _helper.write("    w.writerow(['Code','GMPE','Year','TectonicRegion',\n")
+    _helper.write("        'RequiresDistances','RequiresRupture','RequiresSites',\n")
+    _helper.write("        'DefinedForIMTs','DefinedForStdDevs','Shortcut','Description'])\n")
+    _helper.write("    for r in rows:\n")
+    _helper.write("        w.writerow([r[0],r[0]]+list(r[1:]))\n")
+    _helper.write("print('  \\u2705 Generated ' + repr(_CAT) + ' (' + str(len(rows)) + ' GMPEs)')\n")
+    _helper.write("sys.stdout.flush()\n")
+    _helper.close()
 
-        # Write a self-contained helper script to a temp file
-        _helper = _tf.NamedTemporaryFile(mode="w", suffix=".py", delete=False, prefix="oq_gen_")
-        _helper.write("import csv, re, sys\n")
-        _helper.write("from openquake.hazardlib import gsim\n\n")
-        _helper.write("def _mc(name):\n")
-        _helper.write("    m=re.search(r'(\\d{4})',name)\n")
-        _helper.write("    if not m: return name\n")
-        _helper.write("    yr=m.group(1); ap=name[:m.start()]; sf=name[m.end():]\n")
-        _helper.write("    if 'EtAl' in ap:\n")
-        _helper.write("        code=ap.split('EtAl')[0][:2]\n")
-        _helper.write("    else:\n")
-        _helper.write("        parts=re.findall(r'[A-Z][a-z]*',ap)\n")
-        _helper.write("        code=''.join(p[0] for p in parts if p)\n")
-        _helper.write("    return code+yr+sf\n\n")
-        _helper.write("def _desc(cls):\n")
-        _helper.write("    doc=(cls.__doc__ or '').strip()\n")
-        _helper.write("    para=doc.split(chr(10)*2)[0] if chr(10)*2 in doc else doc\n")
-        _helper.write("    lines=[l.strip() for l in para.split(chr(10)) if l.strip()]\n")
-        _helper.write("    s=' '.join(lines).replace('\\t',' ')\n")
-        _helper.write("    return s[:1997]+'...' if len(s)>2000 else s\n\n")
-        _helper.write("rows=[]\n")
-        _helper.write("for key,cls in sorted(gsim.get_available_gsims().items(),key=lambda x:x[0]):\n")
-        _helper.write("    try:\n")
-        _helper.write("        inst=cls()\n")
-        _helper.write("        m=re.search(r'(\\d{4})',key)\n")
-        _helper.write("        yr=int(m.group(1)) if m else 0\n")
-        _helper.write("        reg=inst.DEFINED_FOR_TECTONIC_REGION_TYPE\n")
-        _helper.write("        rs=reg.value if reg else '\\u2014'\n")
-        _helper.write("        imts=inst.DEFINED_FOR_INTENSITY_MEASURE_TYPES\n")
-        _helper.write("        imt_str=' '.join(sorted(i.__name__.upper() for i in imts)) if imts else ''\n")
-        _helper.write("        stds_tmp=inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES\n")
-        _helper.write("        std_str=' '.join(sorted(stds_tmp)) if stds_tmp else ''\n")
-        _helper.write("        dists=' '.join(sorted(inst.REQUIRES_DISTANCES))\n")
-        _helper.write("        rupts=' '.join(sorted(inst.REQUIRES_RUPTURE_PARAMETERS))\n")
-        _helper.write("        sites=' '.join(sorted(inst.REQUIRES_SITES_PARAMETERS))\n")
-        _helper.write("        sc=_mc(key)\n")
-        _helper.write("        desc=_desc(cls)\n")
-        _helper.write("    except Exception:\n")
-        _helper.write("        yr,rs,imt_str,std_str,dists,rupts,sites,sc,desc=0,'\\u2014','','','','','','',''\n")
-        _helper.write("    rows.append((key,yr,rs,dists,rupts,sites,imt_str,std_str,sc,desc))\n")
-        _helper.write("_CAT = %r\n" % catalogue_path)
-        _helper.write("with open(_CAT,'w',newline='') as f:\n")
-        _helper.write("    w=csv.writer(f)\n")
-        _helper.write("    w.writerow(['Code','GMPE','Year','TectonicRegion',\n")
-        _helper.write("        'RequiresDistances','RequiresRupture','RequiresSites',\n")
-        _helper.write("        'DefinedForIMTs','DefinedForStdDevs','Shortcut','Description'])\n")
-        _helper.write("    for r in rows:\n")
-        _helper.write("        w.writerow([r[0],r[0]]+list(r[1:]))\n")
-        _helper.write("print('  \\u2705 Generated ' + repr(_CAT) + ' (' + str(len(rows)) + ' GMPEs)')\n")
-        _helper.write("sys.stdout.flush()\n")
-        _helper.close()
+    _result = _sp.run([_PYTHON_TO_USE, _helper.name], capture_output=True, text=True, timeout=180)
+    os.unlink(_helper.name)
 
-        _result = _sp.run([_PYTHON_TO_USE, _helper.name], capture_output=True, text=True, timeout=180)
-        os.unlink(_helper.name)
-
-        if _result.returncode == 0:
-            for line in _result.stdout.strip().splitlines():
-                if line.strip():
-                    print(f"  {line.strip()}")
-        else:
-            print(f"  ❌ OpenQuake catalogue generation failed:")
-            for line in _result.stderr.strip().splitlines():
-                print(f"     {line}")
-            print(f"     → Create '{catalogue_path}' manually or install OpenQuake.")
-        return
+    if _result.returncode == 0:
+        for line in _result.stdout.strip().splitlines():
+            if line.strip():
+                print(f"  {line.strip()}")
+    else:
+        print(f"  ❌ OpenQuake catalogue generation failed:")
+        for line in _result.stderr.strip().splitlines():
+            print(f"     {line}")
+        print(f"     → Create '{catalogue_path}' manually or install OpenQuake.")
+    return
 
     # ── We are inside OpenQuake Python — generate the catalogue ──
     from openquake.hazardlib import gsim
@@ -1128,51 +1127,51 @@ def _ensure_catalogue(catalogue_path):
 
     rows = []
     for key, cls in sorted_items:
-        try:
-            inst = cls()
-            m = _year_re.search(key)
-            year = int(m.group(1)) if m else 0
-            dists = inst.REQUIRES_DISTANCES
-            rupt  = inst.REQUIRES_RUPTURE_PARAMETERS
-            sites = inst.REQUIRES_SITES_PARAMETERS
-            region = inst.DEFINED_FOR_TECTONIC_REGION_TYPE
-            region_str = region.value if region else "—"
-            imts = inst.DEFINED_FOR_INTENSITY_MEASURE_TYPES
-            imt_str = " ".join(sorted(imt.__name__.upper() for imt in imts)) if imts else ""
-            stds = inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES
-            std_str = " ".join(sorted(stds)) if stds else ""
-            shortcut = make_gmpe_code(key)
-            # Extract docstring (first paragraph) for user-friendly description
-            doc = (cls.__doc__ or "").strip()
-            para = doc.split("\n\n")[0] if "\n\n" in doc else doc
-            lines = [l.strip() for l in para.split("\n") if l.strip()]
-            description = " ".join(lines).replace("\t", " ")
-            if len(description) > 2000:
-                description = description[:1997] + "..."
-        except Exception:
-            year = 0
-            dists, rupt, sites = set(), set(), set()
-            region_str = "—"
-            imt_str = ""
-            std_str = ""
-            shortcut = ""
-            description = ""
-        rows.append((key, year, region_str, dists, rupt, sites, imt_str, std_str, shortcut, description))
+    try:
+        inst = cls()
+        m = _year_re.search(key)
+        year = int(m.group(1)) if m else 0
+        dists = inst.REQUIRES_DISTANCES
+        rupt  = inst.REQUIRES_RUPTURE_PARAMETERS
+        sites = inst.REQUIRES_SITES_PARAMETERS
+        region = inst.DEFINED_FOR_TECTONIC_REGION_TYPE
+        region_str = region.value if region else "—"
+        imts = inst.DEFINED_FOR_INTENSITY_MEASURE_TYPES
+        imt_str = " ".join(sorted(imt.__name__.upper() for imt in imts)) if imts else ""
+        stds = inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES
+        std_str = " ".join(sorted(stds)) if stds else ""
+        shortcut = make_gmpe_code(key)
+        # Extract docstring (first paragraph) for user-friendly description
+        doc = (cls.__doc__ or "").strip()
+        para = doc.split("\n\n")[0] if "\n\n" in doc else doc
+        lines = [l.strip() for l in para.split("\n") if l.strip()]
+        description = " ".join(lines).replace("\t", " ")
+        if len(description) > 2000:
+            description = description[:1997] + "..."
+    except Exception:
+        year = 0
+        dists, rupt, sites = set(), set(), set()
+        region_str = "—"
+        imt_str = ""
+        std_str = ""
+        shortcut = ""
+        description = ""
+    rows.append((key, year, region_str, dists, rupt, sites, imt_str, std_str, shortcut, description))
 
     import csv as _csv
     with open(catalogue_path, "w", newline="") as f:
-        w = _csv.writer(f)
-        w.writerow(["Code", "GMPE", "Year", "TectonicRegion",
-                     "RequiresDistances", "RequiresRupture", "RequiresSites",
-                     "DefinedForIMTs", "DefinedForStdDevs", "Shortcut",
-                     "Description"])
-        for key, year, region, dists, rupt, sites, imt_str, std_str, shortcut, description in rows:
-            w.writerow([key, key, year, region,
-                        " ".join(sorted(dists)),
-                        " ".join(sorted(rupt)),
-                        " ".join(sorted(sites)),
-                        imt_str, std_str, shortcut,
-                        description])
+    w = _csv.writer(f)
+    w.writerow(["Code", "GMPE", "Year", "TectonicRegion",
+                 "RequiresDistances", "RequiresRupture", "RequiresSites",
+                 "DefinedForIMTs", "DefinedForStdDevs", "Shortcut",
+                 "Description"])
+    for key, year, region, dists, rupt, sites, imt_str, std_str, shortcut, description in rows:
+        w.writerow([key, key, year, region,
+                    " ".join(sorted(dists)),
+                    " ".join(sorted(rupt)),
+                    " ".join(sorted(sites)),
+                    imt_str, std_str, shortcut,
+                    description])
     print(f"  ✅ Generated '{catalogue_path}' ({len(rows)} GMPEs)")
 
 
