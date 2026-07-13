@@ -118,7 +118,7 @@ else:
 def load_catalogue(path):
     """Load GMPE catalogue CSV → list of dicts with parsed sets."""
     rows = []
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8", errors="replace") as f:
         reader = csv.DictReader(f)
         for row in reader:
             row["Year"] = int(row["Year"]) if row["Year"].isdigit() else 0
