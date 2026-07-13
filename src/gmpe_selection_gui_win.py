@@ -1197,8 +1197,9 @@ class GMPESelectionGUI:
             activeBackground=COLORS["card_bg"],
             activeForeground=COLORS["fg"],
         )
-        _FONT_FAMILY = "Segoe UI" if _pltfrm.system() == "Windows" else "Helvetica"
-        self.root.option_add("*Font", "{%s} 11" % _FONT_FAMILY)
+        # Avoid setting a global font with option_add on Windows (font names
+        # with spaces like "Segoe UI" cause Tcl parsing issues). Instead, all
+        # widgets and ttk styles specify their fonts explicitly.
         self.root.option_add("*Background", COLORS["bg"])
         self.root.option_add("*Foreground", COLORS["fg"])
         self.root.option_add("*SelectBackground", COLORS["select_bg"])

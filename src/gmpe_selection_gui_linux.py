@@ -1203,8 +1203,9 @@ class GMPESelectionGUI:
             activeBackground=COLORS["card_bg"],
             activeForeground=COLORS["fg"],
         )
-        _FONT_FAMILY = "DejaVu Sans" if _pltfrm.system() == "Linux" else "Helvetica"
-        self.root.option_add("*Font", "{%s} 11" % _FONT_FAMILY)
+        # Avoid setting a global font with option_add when the font family
+        # contains spaces (e.g. "DejaVu Sans"), as Tcl may misparse the
+        # string format. All widgets and ttk styles specify fonts explicitly.
         self.root.option_add("*Background", COLORS["bg"])
         self.root.option_add("*Foreground", COLORS["fg"])
         self.root.option_add("*SelectBackground", COLORS["select_bg"])
