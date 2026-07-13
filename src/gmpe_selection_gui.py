@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-# gmpe_selection_gui.py — Graphical GMPE selection for RESPMAtch
-#
-# Copyright (C) 2024  Maria Lancieri
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 """
 gmpe_selection_gui.py —  Graphical GMPE selection for RESPMAtch.
 
@@ -726,8 +709,8 @@ def _show_family_variant_dialog(parent, catalogue, display_rows, filters,
 
     dialog = tk.Toplevel(parent)
     dialog.title("GMPE Family Variants")
-    dialog.geometry("620x620")
-    dialog.minsize(500, 400)
+    dialog.geometry("900x620")
+    dialog.minsize(700, 400)
     dialog.configure(bg=COLORS["bg"])
     dialog.transient(parent)
     dialog.grab_set()
@@ -741,17 +724,91 @@ def _show_family_variant_dialog(parent, catalogue, display_rows, filters,
                           "Please choose which ones to keep.",
              font=("Helvetica", 10), fg="#e8daef", bg="#8e44ad", justify=tk.CENTER).pack(pady=(4, 0))
 
-    # ── Scrollable body ──
-    canvas = tk.Canvas(dialog, bg=COLORS["bg"], highlightthickness=0)
-    scrollbar = ttk.Scrollbar(dialog, orient=tk.VERTICAL, command=canvas.yview)
+    # ── Body: horizontal paned window (left: families, right: detail) ──
+    body_pane = ttk.PanedWindow(dialog, orient=tk.HORIZONTAL)
+    body_pane.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+
+    # ── Left pane: scrollable family list ──
+    left_frame = ttk.Frame(body_pane)
+    body_pane.add(left_frame, weight=1)
+
+    canvas = tk.Canvas(left_frame, bg=COLORS["bg"], highlightthickness=0)
+    scrollbar = ttk.Scrollbar(left_frame, orient=tk.VERTICAL, command=canvas.yview)
     scroll_frame = tk.Frame(canvas, bg=COLORS["bg"])
 
     scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas.create_window((0, 0), window=scroll_frame, anchor="nw", width=520)
+    canvas.create_window((0, 0), window=scroll_frame, anchor="nw", width=460)
     canvas.configure(yscrollcommand=scrollbar.set)
 
-    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 0), pady=12)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=12)
+    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(6, 0), pady=6)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=6)
+
+    # ── Right pane: GMPE detail panel ──
+    right_frame = ttk.LabelFrame(body_pane, text=" GMPE Details ", padding="4")
+    body_pane.add(right_frame, weight=1)
+
+    fam_detail_text = tk.Text(right_frame, height=10, wrap=tk.WORD,
+                               font=("Helvetica", 11),
+                               foreground=COLORS["fg"],
+                               background=COLORS["input_bg"],
+                               padx=6, pady=4)
+    fam_detail_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    fam_detail_scroll = ttk.Scrollbar(right_frame, orient=tk.VERTICAL,
+                                       command=fam_detail_text.yview)
+    fam_detail_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+    fam_detail_text.configure(yscrollcommand=fam_detail_scroll.set)
+    fam_detail_text.insert(tk.END, "Click on a GMPE checkbox\nto see its details")
+    fam_detail_text.config(state=tk.DISABLED)
+
+    # ── Helper: show GMPE details in the right panel ──
+    def _show_fam_detail(gmpe_name):
+        """Look up GMPE in the catalogue and display its details."""
+        cat_row = next((r for r in catalogue if r["GMPE"] == gmpe_name), None)
+        if not cat_row:
+            return
+        c_code = cat_row.get("Shortcut", cat_row["Code"])
+        c_year = cat_row["Year"]
+        c_region = cat_row["TectonicRegion"]
+        c_dists = " ".join(sorted(cat_row["RequiresDistances"]))
+        c_sites = " ".join(sorted(cat_row["RequiresSites"]))
+        c_rupt = " ".join(sorted(cat_row["RequiresRupture"]))
+        c_imts = " ".join(sorted(cat_row["DefinedForIMTs"]))
+        c_stds = " ".join(sorted(cat_row["DefinedForStdDevs"]))
+        c_desc = cat_row.get("Description", "").strip()
+        # Try direct OQ import first, fall back to CSV Description column
+        oq_text = None
+        try:
+            from openquake.hazardlib import gsim as _oq_gsim
+            _oq_cls = _oq_gsim.get_available_gsims().get(gmpe_name)
+            if _oq_cls is not None:
+                _doc = (_oq_cls.__doc__ or "").strip()
+                if _doc:
+                    _para = _doc.split("\n\n")[0] if "\n\n" in _doc else _doc
+                    _lines = [l.strip() for l in _para.split("\n") if l.strip()]
+                    _short_desc = " ".join(_lines).replace("\t", " ")
+                    if len(_short_desc) > 2000:
+                        _short_desc = _short_desc[:1997] + "..."
+                    oq_text = _short_desc[:500] + "…" if len(_short_desc) > 500 else _short_desc
+        except Exception:
+            pass
+        if oq_text is None and c_desc:
+            oq_text = c_desc[:500] + "…" if len(c_desc) > 500 else c_desc
+        detail = (
+            f"📌 [{c_code}] {gmpe_name}\n"
+            f"{'=' * 50}\n"
+            f"   Year: {c_year}  |  Region: {c_region}\n"
+            f"   Distances: {c_dists}\n"
+            f"   Sites:      {c_sites}\n"
+            f"   Rupture:    {c_rupt}\n"
+            f"   IMTs:       {c_imts}\n"
+            f"   StdDevs:    {c_stds}\n"
+        )
+        if oq_text:
+            detail += f"{'=' * 50}\n📘 {oq_text}\n"
+        fam_detail_text.config(state=tk.NORMAL)
+        fam_detail_text.delete("1.0", tk.END)
+        fam_detail_text.insert(tk.END, detail)
+        fam_detail_text.config(state=tk.DISABLED)
 
     # ── Mousewheel / trackpad ──
     def _on_mousewheel(event):
@@ -781,19 +838,19 @@ def _show_family_variant_dialog(parent, catalogue, display_rows, filters,
         radio_frame = tk.Frame(scroll_frame, bg=COLORS["card_bg"], padx=10, pady=6)
         radio_frame.grid(row=r, column=0, sticky="ew", padx=6)
 
-        keep_var = tk.StringVar(value="all")  # default: keep all
+        keep_var = tk.StringVar(value="none")  # default: keep none
         all_keep_vars[base] = keep_var
 
-        tk.Radiobutton(radio_frame, text="Keep all variants",
-                       variable=keep_var, value="all",
-                       font=("Helvetica", 10), bg=COLORS["card_bg"], fg=COLORS["fg"],
-                       activebackground=COLORS["card_bg"], selectcolor=COLORS["card_bg"]).pack(anchor=tk.W)
         tk.Radiobutton(radio_frame, text="Keep none (remove all)",
                        variable=keep_var, value="none",
                        font=("Helvetica", 10), bg=COLORS["card_bg"], fg="#e74c3c",
                        activebackground=COLORS["card_bg"], selectcolor=COLORS["card_bg"]).pack(anchor=tk.W)
         tk.Radiobutton(radio_frame, text="Pick specific variants (check below)",
                        variable=keep_var, value="pick",
+                       font=("Helvetica", 10), bg=COLORS["card_bg"], fg=COLORS["fg"],
+                       activebackground=COLORS["card_bg"], selectcolor=COLORS["card_bg"]).pack(anchor=tk.W)
+        tk.Radiobutton(radio_frame, text="Keep all variants",
+                       variable=keep_var, value="all",
                        font=("Helvetica", 10), bg=COLORS["card_bg"], fg=COLORS["fg"],
                        activebackground=COLORS["card_bg"], selectcolor=COLORS["card_bg"]).pack(anchor=tk.W)
 
@@ -804,12 +861,22 @@ def _show_family_variant_dialog(parent, catalogue, display_rows, filters,
 
         member_vars = {}
         for code, name in members:
-            v = tk.BooleanVar(value=True)  # default: keep (checked)
+            v = tk.BooleanVar(value=False)  # default: unchecked
             cb = tk.Checkbutton(list_frame, text=f"[{code}] {name}",
                                 variable=v,
                                 font=("Helvetica", 9), bg=COLORS["panel_bg"], fg=COLORS["fg"],
                                 activebackground=COLORS["panel_bg"])
             cb.pack(anchor=tk.W, padx=4, pady=1)
+            # Show GMPE details in the right panel when toggled
+            def _on_checkbox(*_, _code=code, _name=name, _v=v):
+                if _v.get():
+                    _show_fam_detail(_name)
+                else:
+                    fam_detail_text.config(state=tk.NORMAL)
+                    fam_detail_text.delete("1.0", tk.END)
+                    fam_detail_text.insert(tk.END, "Click on a GMPE checkbox\nto see its details")
+                    fam_detail_text.config(state=tk.DISABLED)
+            v.trace_add("write", _on_checkbox)
             member_vars[(code, name)] = v
 
         # When "none" is selected → uncheck all; when "all" → check all
@@ -913,6 +980,12 @@ def _ensure_catalogue(catalogue_path):
         _helper.write("        parts=re.findall(r'[A-Z][a-z]*',ap)\n")
         _helper.write("        code=''.join(p[0] for p in parts if p)\n")
         _helper.write("    return code+yr+sf\n\n")
+        _helper.write("def _desc(cls):\n")
+        _helper.write("    doc=(cls.__doc__ or '').strip()\n")
+        _helper.write("    para=doc.split(chr(10)*2)[0] if chr(10)*2 in doc else doc\n")
+        _helper.write("    lines=[l.strip() for l in para.split(chr(10)) if l.strip()]\n")
+        _helper.write("    s=' '.join(lines).replace('\\t',' ')\n")
+        _helper.write("    return s[:1997]+'...' if len(s)>2000 else s\n\n")
         _helper.write("rows=[]\n")
         _helper.write("for key,cls in sorted(gsim.get_available_gsims().items(),key=lambda x:x[0]):\n")
         _helper.write("    try:\n")
@@ -929,15 +1002,16 @@ def _ensure_catalogue(catalogue_path):
         _helper.write("        rupts=' '.join(sorted(inst.REQUIRES_RUPTURE_PARAMETERS))\n")
         _helper.write("        sites=' '.join(sorted(inst.REQUIRES_SITES_PARAMETERS))\n")
         _helper.write("        sc=_mc(key)\n")
+        _helper.write("        desc=_desc(cls)\n")
         _helper.write("    except Exception:\n")
-        _helper.write("        yr,rs,imt_str,std_str,dists,rupts,sites,sc=0,'\\u2014','','','','','',''\n")
-        _helper.write("    rows.append((key,yr,rs,dists,rupts,sites,imt_str,std_str,sc))\n")
+        _helper.write("        yr,rs,imt_str,std_str,dists,rupts,sites,sc,desc=0,'\\u2014','','','','','','',''\n")
+        _helper.write("    rows.append((key,yr,rs,dists,rupts,sites,imt_str,std_str,sc,desc))\n")
         _helper.write("_CAT = %r\n" % catalogue_path)
         _helper.write("with open(_CAT,'w',newline='') as f:\n")
         _helper.write("    w=csv.writer(f)\n")
         _helper.write("    w.writerow(['Code','GMPE','Year','TectonicRegion',\n")
         _helper.write("        'RequiresDistances','RequiresRupture','RequiresSites',\n")
-        _helper.write("        'DefinedForIMTs','DefinedForStdDevs','Shortcut'])\n")
+        _helper.write("        'DefinedForIMTs','DefinedForStdDevs','Shortcut','Description'])\n")
         _helper.write("    for r in rows:\n")
         _helper.write("        w.writerow([r[0],r[0]]+list(r[1:]))\n")
         _helper.write("print('  \\u2705 Generated ' + repr(_CAT) + ' (' + str(len(rows)) + ' GMPEs)')\n")
@@ -983,6 +1057,13 @@ def _ensure_catalogue(catalogue_path):
             stds = inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES
             std_str = " ".join(sorted(stds)) if stds else ""
             shortcut = make_gmpe_code(key)
+            # Extract docstring (first paragraph) for user-friendly description
+            doc = (cls.__doc__ or "").strip()
+            para = doc.split("\n\n")[0] if "\n\n" in doc else doc
+            lines = [l.strip() for l in para.split("\n") if l.strip()]
+            description = " ".join(lines).replace("\t", " ")
+            if len(description) > 2000:
+                description = description[:1997] + "..."
         except Exception:
             year = 0
             dists, rupt, sites = set(), set(), set()
@@ -990,20 +1071,23 @@ def _ensure_catalogue(catalogue_path):
             imt_str = ""
             std_str = ""
             shortcut = ""
-        rows.append((key, year, region_str, dists, rupt, sites, imt_str, std_str, shortcut))
+            description = ""
+        rows.append((key, year, region_str, dists, rupt, sites, imt_str, std_str, shortcut, description))
 
     import csv as _csv
     with open(catalogue_path, "w", newline="") as f:
         w = _csv.writer(f)
         w.writerow(["Code", "GMPE", "Year", "TectonicRegion",
                      "RequiresDistances", "RequiresRupture", "RequiresSites",
-                     "DefinedForIMTs", "DefinedForStdDevs", "Shortcut"])
-        for key, year, region, dists, rupt, sites, imt_str, std_str, shortcut in rows:
+                     "DefinedForIMTs", "DefinedForStdDevs", "Shortcut",
+                     "Description"])
+        for key, year, region, dists, rupt, sites, imt_str, std_str, shortcut, description in rows:
             w.writerow([key, key, year, region,
                         " ".join(sorted(dists)),
                         " ".join(sorted(rupt)),
                         " ".join(sorted(sites)),
-                        imt_str, std_str, shortcut])
+                        imt_str, std_str, shortcut,
+                        description])
     print(f"  ✅ Generated '{catalogue_path}' ({len(rows)} GMPEs)")
 
 
@@ -2149,7 +2233,31 @@ class GMPESelectionGUI:
         else:
             description = "No additional metadata available."
 
-        detail = (
+        # Fetch OpenQuake docstring — try direct OQ import first, then CSV fallback
+        oq_display_long = None
+        try:
+            from openquake.hazardlib import gsim as _oq_gsim
+            _oq_cls = _oq_gsim.get_available_gsims().get(name)
+            if _oq_cls is not None:
+                _doc = (_oq_cls.__doc__ or "").strip()
+                if _doc:
+                    _para = _doc.split("\n\n")[0] if "\n\n" in _doc else _doc
+                    _lines = [l.strip() for l in _para.split("\n") if l.strip()]
+                    _short_desc = " ".join(_lines).replace("\t", " ")
+                    if len(_short_desc) > 2000:
+                        _short_desc = _short_desc[:1997] + "..."
+                    oq_display_long = _short_desc[:1000] + "…" if len(_short_desc) > 1000 else _short_desc
+        except Exception:
+            pass
+        if oq_display_long is None:
+            oq_doc = cat_row.get("Description", "").strip()
+            if oq_doc:
+                oq_display_long = oq_doc[:1000] + "…" if len(oq_doc) > 1000 else oq_doc
+
+        detail = ""
+        if oq_display_long:
+            detail += f"📘 {oq_display_long}\n\n"
+        detail += (
             f"📌 [{code}] {name}\n"
             f"{'=' * 60}\n"
             f"   Year: {year}  |  Region: {region}\n"
@@ -2915,7 +3023,8 @@ except Exception as e:
                 # Build figure
                 fig, ax = plt.subplots(1, 1, figsize=(12, 7))
                 _fig_name = p["name"].replace(" ", "_").replace("/", "_")
-                fig.canvas.manager.set_window_title(f"{_fig_name}_selection")
+                _json_name = os.path.splitext(os.path.basename(self.selection_path))[0]
+                fig.canvas.manager.set_window_title(f"{_fig_name}_{_json_name}")
                 ax.set_xscale('log')
                 ax.set_yscale('log')
                 ax.set_xlabel('Frequency [Hz]', fontsize=14)
@@ -2940,7 +3049,7 @@ except Exception as e:
                     # Use the GMPE's native frequency vector for plotting
                     plot_freq = np.array(nat_freq) if nat_freq is not None else freq
                     c = cmap(0.4 + 0.5 * idx / max(n, 1))
-                    short = gname.split("EtAl")[0][:2] + gname[-5:] if "EtAl" in gname else gname
+                    short = make_gmpe_code(gname)
                     ax.plot(plot_freq, mn, color=c, lw=1.2, alpha=0.7, label=short)
                     # Dots at native frequencies (same as data points)
                     ax.scatter(plot_freq, mn, color=c, s=20, zorder=4,
@@ -3224,10 +3333,12 @@ except Exception as e:
                 if plot_data["fig"] is None:
                     return
             from tkinter import filedialog
+            _json_name = os.path.splitext(os.path.basename(self.selection_path))[0]
+            _proj_name = p["name"].replace(" ", "_").replace("/", "_")
             path = filedialog.asksaveasfilename(
                 title="Save GMPE Spectra Figure",
                 initialdir=".",
-                initialfile="GMPE_spectra.pdf",
+                initialfile=f"{_proj_name}_{_json_name}.pdf",
                 defaultextension=".pdf",
                 filetypes=[
                     ("PDF files", "*.pdf"),

@@ -1,7 +1,7 @@
 #!/usr/bin/env python -W ignore::Warning
-# gmpe.py
-# GMPE computation engine for RESPMAtch — wraps OpenQuake hazardlib.
-#
+# signal_analysis.py 
+# Class for seismic acceleration analysis traitment 
+
 # Copyright (C) 2010-2022 Maria LANCIERI
 
 # This program is free software: you can redistribute it and/or modify
@@ -15,7 +15,7 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 import scipy as sp
@@ -212,15 +212,15 @@ class gmmtools:
 
         # Use the GMPE's native periods (its COEFFS table) for computation,
         # then interpolate to the user's frequency grid.
+        user_periods = 1.0 / freq
+        p_min_user = user_periods.min()
+        p_max_user = user_periods.max()
         native_periods = self._get_gmpe_native_periods(gmpe_inst)
         if native_periods is None:
             # Fallback: use the user's frequency grid directly (no COEFFS)
             compute_periods = 1.0 / freq
         else:
             # Only keep periods within the user's requested range
-            user_periods = 1.0 / freq
-            p_min_user = user_periods.min()
-            p_max_user = user_periods.max()
             mask = (native_periods >= p_min_user) & (native_periods <= p_max_user)
             compute_periods = native_periods[mask]
             if len(compute_periods) == 0:
@@ -235,18 +235,38 @@ class gmmtools:
         zone = parzone.value
 
         sites, rupture, distances = self.read_gmpeinput()
-        periods_entry = ["SA(%s)" % p for p in compute_periods]
         stddev = ['Total']
 
         output_mean = []
         output_sigma1m = []
         output_sigma1p = []
-        for i_m in periods_entry:
-            means, sigma = gmpe_inst.get_mean_and_stddevs(
-                sites, rupture, distances, imt.from_string(i_m), stddev)
+        valid_periods = []
+        for p in compute_periods:
+            i_m = "SA(%s)" % p
+            # Validate that this period is within the GMPE's supported SA range.
+            # Some GMPEs have COEFFS entries for periods outside their valid
+            # range — skip those silently rather than failing the entire GMPE.
+            try:
+                imt_obj = imt.from_string(i_m)
+            except Exception:
+                continue
+            try:
+                means, sigma = gmpe_inst.get_mean_and_stddevs(
+                    sites, rupture, distances, imt_obj, stddev)
+            except Exception:
+                continue
             output_mean.append(np.exp(means[0]))
             output_sigma1p.append(np.exp(means[0] + sigma[0][0]))
             output_sigma1m.append(np.exp(means[0] - sigma[0][0]))
+            valid_periods.append(p)
+
+        if len(valid_periods) == 0:
+            raise ValueError(
+                "GMPE '%s': no valid SA periods remaining after filtering. "
+                "Requested range [%.4f, %.4f] s may be outside the GMPE's "
+                "supported period range." % (gmpe, p_min_user, p_max_user))
+
+        compute_periods = np.array(valid_periods)
 
         output_mean    = np.array(output_mean)
         output_sigma1p = np.array(output_sigma1p)
