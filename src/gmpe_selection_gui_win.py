@@ -3000,7 +3000,7 @@ class GMPESelectionGUI:
                 # Build a small Python script that computes GMPEs via gmpe.py
                 script_code = f'''
 import numpy as np, sys, json
-sys.path.insert(0, "{os.path.dirname(os.path.abspath(__file__))}")
+sys.path.insert(0, r"{os.path.dirname(os.path.abspath(__file__))}")
 import gmpe
 tool = gmpe.gmmtools()
 freq = np.array({freq.tolist()})
