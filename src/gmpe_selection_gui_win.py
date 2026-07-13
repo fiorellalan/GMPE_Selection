@@ -993,6 +993,41 @@ def _show_family_variant_dialog(parent, catalogue, display_rows, filters,
 
 # ── Auto‑generate catalogue CSV (silent) ──────────────────────
 
+def _find_oq_python():
+    """Return path to a Python interpreter with OpenQuake installed, or None."""
+    import subprocess as _sp
+    # Prefer dedicated OQ environment
+    _oq_path = os.path.expanduser("~/openquake/Scripts/python.exe")
+    if os.path.exists(_oq_path):
+        print(f"  → Using OpenQuake Python: {_oq_path}")
+        return _oq_path
+    # Check if current interpreter has openquake
+    _check_code = "import openquake.hazardlib; print('OK')"
+    try:
+        _sp.run([sys.executable, "-c", _check_code],
+                capture_output=True, text=True, timeout=15, check=True)
+        print(f"  → Using current Python (openquake available): {sys.executable}")
+        return sys.executable
+    except Exception:
+        pass
+    # Try common fallback paths
+    for _p in [
+        os.path.expanduser("~/anaconda3/python.exe"),
+        os.path.expanduser("~/miniconda3/python.exe"),
+        r"C:\Python311\python.exe",
+        r"C:\Python310\python.exe",
+    ]:
+        if os.path.exists(_p):
+            try:
+                _sp.run([_p, "-c", _check_code],
+                        capture_output=True, text=True, timeout=15, check=True)
+                print(f"  → Using fallback Python: {_p}")
+                return _p
+            except Exception:
+                continue
+    return None
+
+
 def _ensure_catalogue(catalogue_path):
     """Generate gmpe_catalogue.csv if missing — runs OpenQuake silently."""
     if os.path.exists(catalogue_path):
@@ -1002,53 +1037,18 @@ def _ensure_catalogue(catalogue_path):
     import subprocess as _sp
     import tempfile as _tf
 
-    # Locate a Python interpreter that has OpenQuake installed
-    _OQ_PYTHON = os.path.expanduser("~/openquake/Scripts/python.exe")
-    _FALLBACK_PYTHON = sys.executable  # current interpreter (e.g. Anaconda)
-
-    # Check which Python to use: prefer dedicated OQ env, fall back to current
-    _PYTHON_TO_USE = None
-    if os.path.exists(_OQ_PYTHON):
-        _PYTHON_TO_USE = _OQ_PYTHON
-        print(f"  → Using OpenQuake Python: {_OQ_PYTHON}")
-    else:
-        # Check if current interpreter has openquake installed
-        _check_code = "import openquake.hazardlib; print('OK')"
-        try:
-            _sp.run([_FALLBACK_PYTHON, "-c", _check_code],
-                    capture_output=True, text=True, timeout=15, check=True)
-            _PYTHON_TO_USE = _FALLBACK_PYTHON
-            print(f"  → Using current Python (openquake available): {_FALLBACK_PYTHON}")
-        except Exception:
-            pass
-
-    if _PYTHON_TO_USE is None:
-        # Try common fallback paths
-        _ALT_PATHS = [
-            os.path.expanduser("~/anaconda3/python.exe"),
-            os.path.expanduser("~/miniconda3/python.exe"),
-            r"C:\Python311\python.exe",
-            r"C:\Python310\python.exe",
-        ]
-        for _p in _ALT_PATHS:
-            if os.path.exists(_p):
-                try:
-                    _sp.run([_p, "-c", _check_code],
-                            capture_output=True, text=True, timeout=15, check=True)
-                    _PYTHON_TO_USE = _p
-                    print(f"  → Using fallback Python: {_p}")
-                    break
-                except Exception:
-                    continue
+    _PYTHON_TO_USE = _find_oq_python()
 
     if _PYTHON_TO_USE is None:
         print(f"  ❌ Cannot find a Python interpreter with OpenQuake installed.")
         print(f"     Please install OpenQuake or create the catalogue manually.")
-        print(f"     Searched locations:")
-        print(f"       • {_OQ_PYTHON}")
-        print(f"       • {_FALLBACK_PYTHON} (current)")
-        for _p in _ALT_PATHS:
-            print(f"       • {_p}")
+        print(f"     Searched paths:")
+        print(f"       • {os.path.expanduser('~/openquake/Scripts/python.exe')}")
+        print(f"       • {sys.executable} (current)")
+        print(f"       • ~/anaconda3/python.exe")
+        print(f"       • ~/miniconda3/python.exe")
+        print(f"       • C:\\Python311\\python.exe")
+        print(f"       • C:\\Python310\\python.exe")
         return
 
         # Write a self-contained helper script to a temp file
@@ -3032,7 +3032,11 @@ except Exception as e:
                 tmp_script.write(script_code)
                 tmp_script.close()
 
-                oq_python = _OQ_PYTHON
+                oq_python = _find_oq_python()
+                if oq_python is None:
+                    err_var.set("Cannot find Python with OpenQuake installed")
+                    print("  ❌ Cannot find a Python interpreter with OpenQuake installed.")
+                    return
                 proc = subprocess.run(
                     [oq_python, tmp_script.name],
                     capture_output=True, text=True, timeout=120
