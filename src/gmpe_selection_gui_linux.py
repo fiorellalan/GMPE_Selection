@@ -293,7 +293,9 @@ def _show_country_keyword_dialog(parent, catalogue, display_rows, filters):
 
     dialog = tk.Toplevel(parent)
     dialog.title("Region-Specific GMPEs")
-    dialog.geometry("600x580")
+    _sw = dialog.winfo_screenwidth(); _sh = dialog.winfo_screenheight()
+    _dw = min(600, int(_sw * 0.70)); _dh = min(580, int(_sh * 0.80))
+    dialog.geometry(f"{_dw}x{_dh}")
     dialog.minsize(480, 400)
     dialog.configure(bg=COLORS["bg"])
     dialog.transient(parent)
@@ -487,7 +489,9 @@ def _show_guided_questions_dialog(parent):
     """
     dialog = tk.Toplevel(parent)
     dialog.title("Interactive GMPE Selection — Guided Questions")
-    dialog.geometry("620x700")
+    _sw = dialog.winfo_screenwidth(); _sh = dialog.winfo_screenheight()
+    _dw = min(620, int(_sw * 0.75)); _dh = min(700, int(_sh * 0.88))
+    dialog.geometry(f"{_dw}x{_dh}")
     dialog.minsize(500, 500)
     dialog.configure(bg=COLORS["bg"])
     dialog.transient(parent)
@@ -744,7 +748,9 @@ def _show_family_variant_dialog(parent, catalogue, display_rows, filters,
 
     dialog = tk.Toplevel(parent)
     dialog.title("GMPE Family Variants")
-    dialog.geometry("900x620")
+    _sw = dialog.winfo_screenwidth(); _sh = dialog.winfo_screenheight()
+    _dw = min(900, int(_sw * 0.88)); _dh = min(620, int(_sh * 0.85))
+    dialog.geometry(f"{_dw}x{_dh}")
     dialog.minsize(700, 400)
     dialog.configure(bg=COLORS["bg"])
     dialog.transient(parent)
@@ -1358,7 +1364,9 @@ class GMPESelectionGUI:
 
         wizard = tk.Toplevel()
         wizard.title("GMPE Selection — Getting Started")
-        wizard.geometry("600x580")
+        _sw = wizard.winfo_screenwidth(); _sh = wizard.winfo_screenheight()
+        _dw = min(600, int(_sw * 0.70)); _dh = min(580, int(_sh * 0.80))
+        wizard.geometry(f"{_dw}x{_dh}")
         wizard.minsize(480, 350)
         wizard.configure(bg=COLORS["bg"])
         wizard.grab_set()  # modal
@@ -2687,8 +2695,10 @@ class GMPESelectionGUI:
         """Open a dialog to enter event parameters, then plot GMPE spectra with quantiles."""
         dialog = tk.Toplevel(self.root)
         dialog.title("GMPE Spectra — Event Parameters")
-        dialog.geometry("540x840")
-        dialog.minsize(540, 700)
+        _sw = dialog.winfo_screenwidth(); _sh = dialog.winfo_screenheight()
+        _dw = min(540, int(_sw * 0.65)); _dh = min(840, int(_sh * 0.92))
+        dialog.geometry(f"{_dw}x{_dh}")
+        dialog.minsize(_dw, _dh - 40)
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.configure(bg=COLORS["bg"])
