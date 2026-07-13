@@ -270,8 +270,11 @@ def _show_country_keyword_dialog(parent, catalogue, display_rows, filters):
 
     dialog = tk.Toplevel(parent)
     dialog.title("Region-Specific GMPEs")
-    dialog.geometry("600x580")
-    dialog.minsize(480, 400)
+    dialog.update_idletasks()
+    _sw = dialog.winfo_screenwidth(); _sh = dialog.winfo_screenheight()
+    _dw = min(560, int(_sw * 0.65)); _dh = min(540, int(_sh * 0.75))
+    dialog.geometry(f"{_dw}x{_dh}")
+    dialog.minsize(420, 360)
     dialog.configure(bg=COLORS["bg"])
     dialog.transient(parent)
     dialog.grab_set()
@@ -458,8 +461,11 @@ def _show_guided_questions_dialog(parent):
     """
     dialog = tk.Toplevel(parent)
     dialog.title("Interactive GMPE Selection — Guided Questions")
-    dialog.geometry("620x700")
-    dialog.minsize(500, 500)
+    dialog.update_idletasks()
+    _sw = dialog.winfo_screenwidth(); _sh = dialog.winfo_screenheight()
+    _dw = min(580, int(_sw * 0.70)); _dh = min(620, int(_sh * 0.82))
+    dialog.geometry(f"{_dw}x{_dh}")
+    dialog.minsize(420, 420)
     dialog.configure(bg=COLORS["bg"])
     dialog.transient(parent)
     dialog.grab_set()
@@ -709,8 +715,11 @@ def _show_family_variant_dialog(parent, catalogue, display_rows, filters,
 
     dialog = tk.Toplevel(parent)
     dialog.title("GMPE Family Variants")
-    dialog.geometry("900x620")
-    dialog.minsize(700, 400)
+    dialog.update_idletasks()
+    _sw = dialog.winfo_screenwidth(); _sh = dialog.winfo_screenheight()
+    _dw = min(820, int(_sw * 0.82)); _dh = min(560, int(_sh * 0.78))
+    dialog.geometry(f"{_dw}x{_dh}")
+    dialog.minsize(600, 360)
     dialog.configure(bg=COLORS["bg"])
     dialog.transient(parent)
     dialog.grab_set()
@@ -862,13 +871,8 @@ def _show_family_variant_dialog(parent, catalogue, display_rows, filters,
         member_vars = {}
         for code, name in members:
             v = tk.BooleanVar(value=False)  # default: unchecked
-            cb = tk.Checkbutton(list_frame, text=f"[{code}] {name}",
-                                variable=v,
-                                font=("Helvetica", 9), bg=COLORS["panel_bg"], fg=COLORS["fg"],
-                                activebackground=COLORS["panel_bg"])
-            cb.pack(anchor=tk.W, padx=4, pady=1)
-            # Show GMPE details in the right panel when toggled
-            def _on_checkbox(*_, _code=code, _name=name, _v=v):
+            def _on_checkbox(_code=code, _name=name, _v=v):
+                """User clicked a checkbox — show/hide details."""
                 if _v.get():
                     _show_fam_detail(_name)
                 else:
@@ -876,7 +880,11 @@ def _show_family_variant_dialog(parent, catalogue, display_rows, filters,
                     fam_detail_text.delete("1.0", tk.END)
                     fam_detail_text.insert(tk.END, "Click on a GMPE checkbox\nto see its details")
                     fam_detail_text.config(state=tk.DISABLED)
-            v.trace_add("write", _on_checkbox)
+            cb = tk.Checkbutton(list_frame, text=f"[{code}] {name}",
+                                variable=v, command=_on_checkbox,
+                                font=("Helvetica", 9), bg=COLORS["panel_bg"], fg=COLORS["fg"],
+                                activebackground=COLORS["panel_bg"])
+            cb.pack(anchor=tk.W, padx=4, pady=1)
             member_vars[(code, name)] = v
 
         # When "none" is selected → uncheck all; when "all" → check all
@@ -1143,7 +1151,17 @@ class GMPESelectionGUI:
         self.root.deiconify()
         self.root.protocol("WM_DELETE_WINDOW", self._quit_app)
         self.root.title("GMPE Selection — RESPMAtch")
-        self.root.geometry("1400x850")
+        # Adapt window size to screen (80% of usable area, max 1300×750)
+        self.root.update_idletasks()
+        _sw = self.root.winfo_screenwidth()
+        _sh = self.root.winfo_screenheight()
+        _w = min(1300, int(_sw * 0.80))
+        _h = min(750, int(_sh * 0.78))
+        self.root.geometry(f"{_w}x{_h}")
+        # Center on screen, ensuring title bar stays visible
+        _x = max(0, (_sw - _w) // 2)
+        _y = max(0, (_sh - _h) // 2 - 20)
+        self.root.geometry(f"+{_x}+{_y}")
         self._setup_style()
         self._auto_apply_after_id = None
         self._build_ui()
@@ -1266,8 +1284,11 @@ class GMPESelectionGUI:
 
         wizard = tk.Toplevel()
         wizard.title("GMPE Selection — Getting Started")
-        wizard.geometry("600x580")
-        wizard.minsize(480, 350)
+        wizard.update_idletasks()
+        _sw = wizard.winfo_screenwidth(); _sh = wizard.winfo_screenheight()
+        _dw = min(560, int(_sw * 0.65)); _dh = min(540, int(_sh * 0.75))
+        wizard.geometry(f"{_dw}x{_dh}")
+        wizard.minsize(420, 300)
         wizard.configure(bg=COLORS["bg"])
         wizard.grab_set()  # modal
 
@@ -1473,9 +1494,13 @@ class GMPESelectionGUI:
     # ── UI construction ───────────────────────────────────────
 
     def _build_ui(self):
+        # ── Root grid layout: bottom bar row always visible ──
+        self.root.grid_rowconfigure(1, weight=1)  # main_pane row expands
+        self.root.grid_columnconfigure(0, weight=1)
+
         # ── Top bar: event tabs ──
         top_frame = ttk.Frame(self.root, padding="6")
-        top_frame.pack(fill=tk.X)
+        top_frame.grid(row=0, column=0, sticky="ew")
 
         ttk.Label(top_frame, text="Event:", font=("Helvetica", 13, "bold")).pack(side=tk.LEFT, padx=(0, 6))
         self.event_var = tk.StringVar(value=self.current_event)
@@ -1497,7 +1522,7 @@ class GMPESelectionGUI:
 
         # ── Main pane: filters (left) + GMPE list (right) ──
         main_pane = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
-        main_pane.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+        main_pane.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
 
         # ── Left panel: Filters ──
         filter_frame = ttk.LabelFrame(main_pane, text=" Filters ", padding="8")
@@ -1794,7 +1819,7 @@ class GMPESelectionGUI:
 
     def _build_bottom_bar(self):
         bar = ttk.Frame(self.root, padding="4")
-        bar.pack(fill=tk.X, side=tk.BOTTOM)
+        bar.grid(row=2, column=0, sticky="ew")
 
         ttk.Button(bar, text="💾  Save Selection",
                    command=self._save_selection).pack(side=tk.LEFT, padx=2)
@@ -2589,8 +2614,11 @@ class GMPESelectionGUI:
         """Open a dialog to enter event parameters, then plot GMPE spectra with quantiles."""
         dialog = tk.Toplevel(self.root)
         dialog.title("GMPE Spectra — Event Parameters")
-        dialog.geometry("540x840")
-        dialog.minsize(540, 700)
+        dialog.update_idletasks()
+        _sw = dialog.winfo_screenwidth(); _sh = dialog.winfo_screenheight()
+        _dw = min(500, int(_sw * 0.55)); _dh = min(750, int(_sh * 0.85))
+        dialog.geometry(f"{_dw}x{_dh}")
+        dialog.minsize(_dw, _dh - 60)
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.configure(bg=COLORS["bg"])

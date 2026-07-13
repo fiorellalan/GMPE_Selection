@@ -1573,9 +1573,13 @@ class GMPESelectionGUI:
     # ── UI construction ───────────────────────────────────────
 
     def _build_ui(self):
+        # ── Root grid layout: bottom bar row always visible ──
+        self.root.grid_rowconfigure(1, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+
         # ── Top bar: event tabs ──
         top_frame = ttk.Frame(self.root, padding="6")
-        top_frame.pack(fill=tk.X)
+        top_frame.grid(row=0, column=0, sticky="ew")
 
         ttk.Label(top_frame, text="Event:", font=("Helvetica", 13, "bold")).pack(side=tk.LEFT, padx=(0, 6))
         self.event_var = tk.StringVar(value=self.current_event)
@@ -1597,7 +1601,7 @@ class GMPESelectionGUI:
 
         # ── Main pane: filters (left) + GMPE list (right) ──
         main_pane = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
-        main_pane.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+        main_pane.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
 
         # ── Left panel: Filters ──
         filter_frame = ttk.LabelFrame(main_pane, text=" Filters ", padding="8")
@@ -1901,7 +1905,7 @@ class GMPESelectionGUI:
 
     def _build_bottom_bar(self):
         bar = ttk.Frame(self.root, padding="4")
-        bar.pack(fill=tk.X, side=tk.BOTTOM)
+        bar.grid(row=2, column=0, sticky="ew")
 
         ttk.Button(bar, text="💾  Save Selection",
                    command=self._save_selection).pack(side=tk.LEFT, padx=2)
