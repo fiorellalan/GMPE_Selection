@@ -1127,51 +1127,51 @@ def _ensure_catalogue(catalogue_path):
 
     rows = []
     for key, cls in sorted_items:
-    try:
-        inst = cls()
-        m = _year_re.search(key)
-        year = int(m.group(1)) if m else 0
-        dists = inst.REQUIRES_DISTANCES
-        rupt  = inst.REQUIRES_RUPTURE_PARAMETERS
-        sites = inst.REQUIRES_SITES_PARAMETERS
-        region = inst.DEFINED_FOR_TECTONIC_REGION_TYPE
-        region_str = region.value if region else "—"
-        imts = inst.DEFINED_FOR_INTENSITY_MEASURE_TYPES
-        imt_str = " ".join(sorted(imt.__name__.upper() for imt in imts)) if imts else ""
-        stds = inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES
-        std_str = " ".join(sorted(stds)) if stds else ""
-        shortcut = make_gmpe_code(key)
-        # Extract docstring (first paragraph) for user-friendly description
-        doc = (cls.__doc__ or "").strip()
-        para = doc.split("\n\n")[0] if "\n\n" in doc else doc
-        lines = [l.strip() for l in para.split("\n") if l.strip()]
-        description = " ".join(lines).replace("\t", " ")
-        if len(description) > 2000:
-            description = description[:1997] + "..."
-    except Exception:
-        year = 0
-        dists, rupt, sites = set(), set(), set()
-        region_str = "—"
-        imt_str = ""
-        std_str = ""
-        shortcut = ""
-        description = ""
-    rows.append((key, year, region_str, dists, rupt, sites, imt_str, std_str, shortcut, description))
+        try:
+            inst = cls()
+            m = _year_re.search(key)
+            year = int(m.group(1)) if m else 0
+            dists = inst.REQUIRES_DISTANCES
+            rupt  = inst.REQUIRES_RUPTURE_PARAMETERS
+            sites = inst.REQUIRES_SITES_PARAMETERS
+            region = inst.DEFINED_FOR_TECTONIC_REGION_TYPE
+            region_str = region.value if region else "—"
+            imts = inst.DEFINED_FOR_INTENSITY_MEASURE_TYPES
+            imt_str = " ".join(sorted(imt.__name__.upper() for imt in imts)) if imts else ""
+            stds = inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES
+            std_str = " ".join(sorted(stds)) if stds else ""
+            shortcut = make_gmpe_code(key)
+            # Extract docstring (first paragraph) for user-friendly description
+            doc = (cls.__doc__ or "").strip()
+            para = doc.split("\n\n")[0] if "\n\n" in doc else doc
+            lines = [l.strip() for l in para.split("\n") if l.strip()]
+            description = " ".join(lines).replace("\t", " ")
+            if len(description) > 2000:
+                description = description[:1997] + "..."
+        except Exception:
+            year = 0
+            dists, rupt, sites = set(), set(), set()
+            region_str = "—"
+            imt_str = ""
+            std_str = ""
+            shortcut = ""
+            description = ""
+        rows.append((key, year, region_str, dists, rupt, sites, imt_str, std_str, shortcut, description))
 
     import csv as _csv
     with open(catalogue_path, "w", newline="") as f:
-    w = _csv.writer(f)
-    w.writerow(["Code", "GMPE", "Year", "TectonicRegion",
-                 "RequiresDistances", "RequiresRupture", "RequiresSites",
-                 "DefinedForIMTs", "DefinedForStdDevs", "Shortcut",
-                 "Description"])
-    for key, year, region, dists, rupt, sites, imt_str, std_str, shortcut, description in rows:
-        w.writerow([key, key, year, region,
-                    " ".join(sorted(dists)),
-                    " ".join(sorted(rupt)),
-                    " ".join(sorted(sites)),
-                    imt_str, std_str, shortcut,
-                    description])
+        w = _csv.writer(f)
+        w.writerow(["Code", "GMPE", "Year", "TectonicRegion",
+          "RequiresDistances", "RequiresRupture", "RequiresSites",
+          "DefinedForIMTs", "DefinedForStdDevs", "Shortcut",
+          "Description"])
+        for key, year, region, dists, rupt, sites, imt_str, std_str, shortcut, description in rows:
+            w.writerow([key, key, year, region,
+              " ".join(sorted(dists)),
+              " ".join(sorted(rupt)),
+              " ".join(sorted(sites)),
+              imt_str, std_str, shortcut,
+              description])
     print(f"  ✅ Generated '{catalogue_path}' ({len(rows)} GMPEs)")
 
 
