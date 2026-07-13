@@ -1,20 +1,5 @@
 # compute_targetspectra.py  —  Spectres GMM en format compatible RSPMatch
 #
-# Copyright (C) 2024  Maria Lancieri
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 # Usage:
 #   python compute_targetspectra.py <config.json>
 #
@@ -87,49 +72,27 @@ print(f"  ✓ Scenario: Vs30={Vs30}, rake={rake}, dip={dip}, Rx={Rx}")
 for ev in events:
     print(f"  ✓ Event '{ev}': Epi={Epi[ev]}, depth={depth[ev]}, mag={mag[ev]}")
 
-# ── Frequency grids based on each GMPE's native (COEFFS) frequency range ──
-# BergeThierry native frequencies
+# ── User-requested frequency range ──
+# Each GMPE is computed on its native frequencies clipped to this range.
+FMIN = 0.25   # Hz
+FMAX = 33.0   # Hz
+NPTS = 100
+
+# BergeThierry native frequencies (clipped to user range)
 bt_inst = AVAILABLE_GSIMS['BergeThierryEtAl2003Ms']()
 bt_native_periods = tool._get_gmpe_native_periods(bt_inst)
 if bt_native_periods is not None:
     freq_BT = np.sort(1.0 / np.array(bt_native_periods))
-    # Keep only within [0.25, 33] Hz
-    freq_BT = freq_BT[(freq_BT >= 0.25) & (freq_BT <= 33)]
+    freq_BT = freq_BT[(freq_BT >= FMIN) & (freq_BT <= FMAX)]
 else:
-    freq_BT = np.logspace(np.log10(0.25), np.log10(33), 100)
+    freq_BT = np.logspace(np.log10(FMIN), np.log10(FMAX), NPTS)
 
-# Common native range across all other GMPEs in the config
-all_gmpe_names = set()
-for ev in events:
-    all_gmpe_names.update(GMPElist[ev])
+# User reference grid — used only to define the min/max bounds for clipping
+# each GMPE's native periods. Actual computation points come from COEFFS.
+freq_user = np.logspace(np.log10(FMIN), np.log10(FMAX), NPTS)
 
-f_min_list, f_max_list = [], []
-for ngmpe in all_gmpe_names:
-    try:
-        inst = AVAILABLE_GSIMS[ngmpe]()
-        periods = tool._get_gmpe_native_periods(inst)
-        if periods is not None:
-            freqs = 1.0 / np.array(periods)
-            f_min_list.append(freqs.min())
-            f_max_list.append(freqs.max())
-    except Exception:
-        pass
-
-if f_min_list and f_max_list:
-    # Intersection of all GMPE ranges — highest low bound, lowest high bound
-    common_fmin = max(max(f_min_list), 0.5)
-    common_fmax = min(min(f_max_list), 33)
-else:
-    common_fmin, common_fmax = 0.5, 33
-
-if common_fmin >= common_fmax:
-    # Fallback if intersection is empty
-    common_fmin, common_fmax = 0.5, 33
-
-freq_range = np.logspace(np.log10(common_fmin), np.log10(common_fmax), 100)
-
-print(f"  ℹ freq_BT range:    [{freq_BT.min():.4f}, {freq_BT.max():.4f}] Hz  ({len(freq_BT)} pts)")
-print(f"  ℹ freq_range range: [{freq_range.min():.4f}, {freq_range.max():.4f}] Hz  ({len(freq_range)} pts)")
+print(f"  ℹ User frequency range: [{FMIN}, {FMAX}] Hz  ({NPTS} pts)")
+print(f"  ℹ freq_BT range:        [{freq_BT.min():.4f}, {freq_BT.max():.4f}] Hz  ({len(freq_BT)} pts)")
 
 BT2003_RP3 = {}
 BT2003_freq = {}
@@ -151,7 +114,7 @@ for ev in events:
     VarGMPE[ev] = {}
     VarFreq[ev] = {}
     batch = tool.compute_batch(
-        GMPElist[ev], freq_range,
+        GMPElist[ev], freq_user,
         mag[ev], depth[ev], Epi[ev], Vs30,
         dip=dip, rake=rake, Rx=Rx)
     failed = {e["gmpe"] for e in batch.get("errors", [])}
@@ -173,9 +136,12 @@ for ev in events:
             fmax = VarFreq[ev][ngmpe].max()
             print(f"  {ngmpe}  freq range: [{fmin:.3f}, {fmax:.3f}] Hz")
 
-# ── Interpolate each GMPE onto its own 100-point grid ──
-# The grid covers that GMPE's native frequency range so that .tgt files
-# always have exactly 100 points, each over its specific range.
+# ── Interpolate each GMPE onto 100 points over its truncated range ──
+# Each GMPE was computed at its native frequencies clipped to [FMIN, FMAX].
+# The clipped native range (nat_freq.min() .. nat_freq.max()) may be shorter
+# than [FMIN, FMAX] if the GMPE does not cover the full user range.
+# We create a 100-point logspace grid over this *truncated* range, so that
+# .tgt files always have exactly 100 points, each over its GMPE's valid range.
 VarFreq_interp = {}   # event → GMPE name → 100-point frequency grid
 VarGMPE_interp = {}   # event → GMPE name → spectrum on that grid
 for ev in events:
@@ -186,15 +152,19 @@ for ev in events:
             continue
         nat_freq = VarFreq[ev][ngmpe]
         nat_spec = VarGMPE[ev][ngmpe]
-        # Sort native data by ascending frequency for np.interp
+        # Sort native data by ascending frequency (gmpe.py may return
+        # decreasing frequencies since periods are sorted increasingly)
         idx = np.argsort(nat_freq)
-        fmin = nat_freq[idx][0]
-        fmax = nat_freq[idx][-1]
-        # 100-point logspace grid over this GMPE's native range
-        grid = np.logspace(np.log10(fmin), np.log10(fmax), 100)
+        nat_freq_sorted = nat_freq[idx]
+        nat_spec_sorted = nat_spec[idx]
+        # Truncated range = intersection of [FMIN, FMAX] with native range
+        fmin = max(nat_freq_sorted.min(), FMIN)
+        fmax = min(nat_freq_sorted.max(), FMAX)
+        # 100-point logspace grid over the truncated range
+        grid = np.logspace(np.log10(fmin), np.log10(fmax), NPTS)
         VarFreq_interp[ev][ngmpe] = grid
         VarGMPE_interp[ev][ngmpe] = np.interp(
-            grid, nat_freq[idx], nat_spec[idx])
+            grid, nat_freq_sorted, nat_spec_sorted)
 
 # ---------- GMPE code (already loaded above) ----------
 
