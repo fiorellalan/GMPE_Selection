@@ -32,15 +32,11 @@ class gmmtools:
 
 
     def read_gmpeinput (self):
-        from openquake.hazardlib import gsim, imt
-        from openquake.hazardlib.contexts import SitesContext, RuptureContext, DistancesContext
-        from openquake.hazardlib.site import SiteCollection
-        from openquake.hazardlib.source.rupture import BaseRupture
-        import math
+        # OpenQuake >= 3.9 removed SitesContext/DistancesContext: site,
+        # rupture and distance parameters now live in a single Context.
+        from openquake.hazardlib.contexts import RuptureContext
 
-        sites = SitesContext()
-        rupture = RuptureContext()
-        distances = DistancesContext()   
+        ctx = RuptureContext()
 
         # Use user-provided values if given, otherwise infer from vs30
         if self.z1pt0 is not None:
@@ -63,42 +59,42 @@ class gmmtools:
         Rhypo = np.sqrt(self.Epi**2+self.depth**2)
         print (Rhypo)
         
-        setattr(sites,'vs30', np.array([float(self.vs30)]))
-        setattr(sites,'region',np.array([self.region]))
-        setattr(sites,'z2pt5',np.array([float(z2pt5)]))
-        setattr(sites,'z1pt0',np.array([float(z1pt0)]))
+        setattr(ctx,'vs30', np.array([float(self.vs30)]))
+        setattr(ctx,'region',np.array([self.region]))
+        setattr(ctx,'z2pt5',np.array([float(z2pt5)]))
+        setattr(ctx,'z1pt0',np.array([float(z1pt0)]))
         if self.vs30measured is not None:
-            setattr(sites,'vs30measured', np.array([float(self.vs30measured)]))
+            setattr(ctx,'vs30measured', np.array([float(self.vs30measured)]))
         else:
-            setattr(sites,'vs30measured', np.array([float(self.vs30)]))
+            setattr(ctx,'vs30measured', np.array([float(self.vs30)]))
         if self.z1pt4 is not None:
-            setattr(sites,'z1pt4', np.array([float(self.z1pt4)]))
+            setattr(ctx,'z1pt4', np.array([float(self.z1pt4)]))
         if self.backarc is not None:
-            setattr(sites,'backarc', np.array([float(self.backarc)]))
-        setattr(sites,'sids',np.arange(1))
-        if self.rake is not None: setattr(rupture,'rake',self.rake)
-        if self.dip is not None:  setattr(rupture,'dip',float(self.dip))
-        setattr(rupture,'mag',       np.array([float(self.mag)]))
-        setattr(rupture,'hypo_depth', np.array([float(self.depth)]))
-        if self.width is not None: setattr(rupture,'width',np.array([float(self.width)]))
-        if self.ztor is not None: setattr(rupture,'ztor',      np.array([float(self.ztor)]))
-        setattr(distances,'rhypo',np.array([float(Rhypo)]))
-        if self.Rjb is not None: setattr(distances,'rjb',  np.array([float(self.Rjb)]))
-        if self.Rrup is not None:  setattr(distances,'rrup', np.array([float(self.Rrup)]))
-        if self.Rx   is not None: setattr(distances,'rx',   np.array([float(self.Rx)]))
-        if self.Ry0  is not None: setattr(distances,'ry0',  np.array([float(self.Ry0)]))
-        if self.repi is not None: setattr(distances,'repi', np.array([float(self.repi)]))
-        if self.rvolc is not None: setattr(distances,'rvolc', np.array([float(self.rvolc)]))
-        if self.rcdpp is not None: setattr(distances,'rcdpp', np.array([float(self.rcdpp)]))
-        if self.clat is not None: setattr(distances,'clat', np.array([float(self.clat)]))
-        if self.clon is not None: setattr(distances,'clon', np.array([float(self.clon)]))
-        if self.azimuth is not None: setattr(distances,'azimuth', np.array([float(self.azimuth)]))
+            setattr(ctx,'backarc', np.array([float(self.backarc)]))
+        setattr(ctx,'sids',np.arange(1))
+        if self.rake is not None: setattr(ctx,'rake',np.array([float(self.rake)]))
+        if self.dip is not None:  setattr(ctx,'dip',np.array([float(self.dip)]))
+        setattr(ctx,'mag',        np.array([float(self.mag)]))
+        setattr(ctx,'hypo_depth', np.array([float(self.depth)]))
+        if self.width is not None: setattr(ctx,'width',np.array([float(self.width)]))
+        if self.ztor is not None: setattr(ctx,'ztor',np.array([float(self.ztor)]))
+        setattr(ctx,'rhypo',np.array([float(Rhypo)]))
+        if self.Rjb is not None: setattr(ctx,'rjb',  np.array([float(self.Rjb)]))
+        if self.Rrup is not None:  setattr(ctx,'rrup', np.array([float(self.Rrup)]))
+        if self.Rx   is not None: setattr(ctx,'rx',   np.array([float(self.Rx)]))
+        if self.Ry0  is not None: setattr(ctx,'ry0',  np.array([float(self.Ry0)]))
+        if self.repi is not None: setattr(ctx,'repi', np.array([float(self.repi)]))
+        if self.rvolc is not None: setattr(ctx,'rvolc', np.array([float(self.rvolc)]))
+        if self.rcdpp is not None: setattr(ctx,'rcdpp', np.array([float(self.rcdpp)]))
+        if self.clat is not None: setattr(ctx,'clat', np.array([float(self.clat)]))
+        if self.clon is not None: setattr(ctx,'clon', np.array([float(self.clon)]))
+        if self.azimuth is not None: setattr(ctx,'azimuth', np.array([float(self.azimuth)]))
         #decomment to check in input
-        #print ("Vs30",sites.vs30, "Z2500",sites.z2pt5, "Z1000", sites.z1pt0, "FlagVs30",sites.vs30measured)
-        #print ("rake",rupture.rake, "dip", rupture.dip,"mag", rupture.mag, "ztor", rupture.ztor, "depth", rupture.hypo_depth)
-        #print ("rhypo", distances.rhypo, "rjb", distances.rjb, "rrup", distances.rrup, "rx", distances.rx)
+        #print ("Vs30",ctx.vs30, "Z2500",ctx.z2pt5, "Z1000", ctx.z1pt0, "FlagVs30",ctx.vs30measured)
+        #print ("rake",ctx.rake, "dip", ctx.dip,"mag", ctx.mag, "ztor", ctx.ztor, "depth", ctx.hypo_depth)
+        #print ("rhypo", ctx.rhypo, "rjb", ctx.rjb, "rrup", ctx.rrup, "rx", ctx.rx)
 
-        return sites,rupture,distances
+        return ctx
 
 
     def _get_gmpe_period_range(self, gmpe_inst):
@@ -208,7 +204,27 @@ class gmmtools:
         self.vs30 = vs30
 
         AVAILABLE_GSIMS = gsim.get_available_gsims()
-        gmpe_inst = AVAILABLE_GSIMS[gmpe]()
+        gmpe_cls = AVAILABLE_GSIMS[gmpe]
+        try:
+            gmpe_inst = gmpe_cls()
+        except TypeError:
+            # Some GMPEs need constructor arguments, e.g. the Douglas et al.
+            # (2024) branch variants require 'branch' (no default). Supply
+            # safe defaults for required arguments: branch=1 mirrors the
+            # OpenQuake default of the non-branch-specific Rrup class.
+            import inspect
+            init_kwargs = {}
+            for pname, par in inspect.signature(gmpe_cls.__init__).parameters.items():
+                if pname == 'self' or par.kind in (
+                        inspect.Parameter.VAR_POSITIONAL,
+                        inspect.Parameter.VAR_KEYWORD):
+                    continue
+                if par.default is inspect.Parameter.empty:
+                    if 'branch' in pname.lower():
+                        init_kwargs[pname] = 1
+                    else:
+                        raise
+            gmpe_inst = gmpe_cls(**init_kwargs)
 
         # Use the GMPE's native periods (its COEFFS table) for computation,
         # then interpolate to the user's frequency grid.
@@ -234,8 +250,8 @@ class gmmtools:
         parzone = gmpe_inst.DEFINED_FOR_TECTONIC_REGION_TYPE
         zone = parzone.value
 
-        sites, rupture, distances = self.read_gmpeinput()
-        stddev = ['Total']
+        rctx = self.read_gmpeinput()
+        from openquake.hazardlib.contexts import ContextMaker
 
         output_mean = []
         output_sigma1m = []
@@ -247,17 +263,23 @@ class gmmtools:
             # Some GMPEs have COEFFS entries for periods outside their valid
             # range — skip those silently rather than failing the entire GMPE.
             try:
-                imt_obj = imt.from_string(i_m)
+                imt.from_string(i_m)
             except Exception:
                 continue
             try:
-                means, sigma = gmpe_inst.get_mean_and_stddevs(
-                    sites, rupture, distances, imt_obj, stddev)
+                # OpenQuake >= 3.9 API: a ContextMaker evaluates the GSIM on
+                # a single context object. out[0]=mean, out[1]=total sigma,
+                # out[2]=tau, out[3]=phi (shape 4, G, M, N).
+                cmaker = ContextMaker('*', [gmpe_inst], {'imtls': {i_m: [0]}})
+                ctx_arr = cmaker.recarray([rctx])
+                out = cmaker.get_mean_stds([ctx_arr], split_by_mag=False)
+                mean = out[0, 0, 0, 0]
+                sigma = out[1, 0, 0, 0]
             except Exception:
                 continue
-            output_mean.append(np.exp(means[0]))
-            output_sigma1p.append(np.exp(means[0] + sigma[0][0]))
-            output_sigma1m.append(np.exp(means[0] - sigma[0][0]))
+            output_mean.append(np.exp(mean))
+            output_sigma1p.append(np.exp(mean + sigma))
+            output_sigma1m.append(np.exp(mean - sigma))
             valid_periods.append(p)
 
         if len(valid_periods) == 0:
