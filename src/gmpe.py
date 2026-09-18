@@ -347,7 +347,9 @@ class gmmtools:
         z1pt4 : float or None — depth to 1.4 km/s (km)
         backarc : float or None — back-arc flag (0/1)
         gmpe_args : dict or None — per-GMPE constructor arguments, e.g.
-            {"Douglas_Et_Al_2024Rjb_3branch": {"branch": 1}}
+            {"Douglas_Et_Al_2024Rjb_3branch": {"branch": 1}}. A list value
+            (e.g. {"branch": [1, 2, 3]}) is expanded into one curve per
+            value, labelled "<GMPE> (branch=1)" etc.
 
         Returns
         -------
@@ -378,23 +380,37 @@ class gmmtools:
         results = {}
         errors = []
         for gname in gmpe_list:
-            try:
-                mean, sig1m, sig1p, dist, zone, nat_freq = self.computegmpe(
-                    gname, freq, mag, depth, epi, vs30,
-                    dip=dip, rake=rake, Rx=Rx,
-                    Rjb=Rjb, Rrup=Rrup, ztor=ztor,
-                    width=width, z1pt0=z1pt0, z2pt5=z2pt5,
-                    repi=repi, rvolc=rvolc, rcdpp=rcdpp,
-                    clat=clat, clon=clon, azimuth=azimuth,
-                    vs30measured=vs30measured, z1pt4=z1pt4,
-                    backarc=backarc,
-                    gmpe_args=gmpe_args,
-                )
-                results[gname] = [mean.tolist(), sig1m.tolist(), sig1p.tolist(),
-                                  nat_freq]
-            except Exception as e:
-                errors.append({"gmpe": gname, "error": str(e)})
-                print("  \u2717 %s: %s" % (gname, e), file=_sys.stderr)
+            base_args = dict((gmpe_args or {}).get(gname) or {})
+            # A list of values for the same argument (e.g. the Douglas et al.
+            # (2024) 'branch' selection) is expanded into one GMPE instance
+            # per value, so several branches are computed and plotted.
+            variants = []
+            branch_vals = base_args.get('branch')
+            if isinstance(branch_vals, (list, tuple)):
+                for b in branch_vals:
+                    args = dict(base_args)
+                    args['branch'] = b
+                    variants.append(("%s (branch=%s)" % (gname, b), args))
+            else:
+                variants.append((gname, base_args))
+            for label, args in variants:
+                try:
+                    mean, sig1m, sig1p, dist, zone, nat_freq = self.computegmpe(
+                        gname, freq, mag, depth, epi, vs30,
+                        dip=dip, rake=rake, Rx=Rx,
+                        Rjb=Rjb, Rrup=Rrup, ztor=ztor,
+                        width=width, z1pt0=z1pt0, z2pt5=z2pt5,
+                        repi=repi, rvolc=rvolc, rcdpp=rcdpp,
+                        clat=clat, clon=clon, azimuth=azimuth,
+                        vs30measured=vs30measured, z1pt4=z1pt4,
+                        backarc=backarc,
+                        gmpe_args={gname: args},
+                    )
+                    results[label] = [mean.tolist(), sig1m.tolist(),
+                                      sig1p.tolist(), nat_freq]
+                except Exception as e:
+                    errors.append({"gmpe": label, "error": str(e)})
+                    print("  \u2717 %s: %s" % (label, e), file=_sys.stderr)
         if errors:
             print("  \u26a0 %d GMPE(s) failed" % len(errors), file=_sys.stderr)
         return {"results": results, "errors": errors}

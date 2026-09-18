@@ -25,9 +25,9 @@ from datetime import datetime
 from tkinter import ttk, messagebox, filedialog
 
 try:
-    from gmpe_args import GMPE_CTOR_ARGS
+    from gmpe_args import GMPE_CTOR_ARGS, GMPE_ARG_HINTS
 except ImportError:  # keep the GUI usable if the file is missing
-    GMPE_CTOR_ARGS = {}
+    GMPE_CTOR_ARGS, GMPE_ARG_HINTS = {}, {}
 
 
 # ── Constants ─────────────────────────────────────────────────
@@ -2880,7 +2880,11 @@ class GMPESelectionGUI:
                 _row = ttk.Frame(_inner)
                 _row.pack(fill=tk.X, pady=1)
                 _txt = _gname + "  →  " + (
-                    "kwargs (JSON)" if _arg == "*" else _arg) + ":"
+                    "kwargs (JSON)" if _arg == "*" else _arg)
+                _hint = GMPE_ARG_HINTS.get(_gname, {}).get(_arg)
+                if _hint:
+                    _txt += "  [" + _hint + "]"
+                _txt += ":"
                 ttk.Label(_row, text=_txt,
                           font=("Helvetica", 9)).pack(side=tk.LEFT)
                 _var = tk.StringVar(value=_default)
@@ -2902,9 +2906,12 @@ class GMPESelectionGUI:
                 _extra_vars[(_gname, _arg, _kind)] = _var
             ttk.Label(_inner,
                       text="Pre-filled where OpenQuake defines a default — "
-                           "red = value required.",
-                      font=("Helvetica", 8),
-                      foreground="#666").pack(anchor=tk.W, pady=(2, 0))
+                           "red = value required.\n"
+                           "Several branches: type e.g. 1,2,3 or a range "
+                           "1-5 (one curve per branch).",
+                      font=("Helvetica", 8), foreground="#666",
+                      justify=tk.LEFT, wraplength=460).pack(anchor=tk.W,
+                                                           pady=(2, 0))
 
         # ── GMPE count info ──
         gmpe_info = ttk.Label(dialog,
@@ -3050,7 +3057,21 @@ class GMPESelectionGUI:
                 if _raw == "":
                     continue
                 try:
-                    if _kind == "int":
+                    if _kind == "int_list":
+                        # comma-separated values and/or ranges, e.g. "1,2,3"
+                        # or "1-5" → several curves (one per branch)
+                        _vals = []
+                        for _part in _raw.replace(";", ",").split(","):
+                            _part = _part.strip()
+                            if not _part:
+                                continue
+                            if "-" in _part[1:]:
+                                _a, _b = _part.split("-", 1)
+                                _vals.extend(range(int(_a), int(_b) + 1))
+                            else:
+                                _vals.append(int(_part))
+                        _val = _vals[0] if len(_vals) == 1 else _vals
+                    elif _kind == "int":
                         _val = int(_raw)
                     elif _kind == "float":
                         _val = float(_raw)

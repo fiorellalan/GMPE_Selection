@@ -23,6 +23,8 @@ means "no default in OpenQuake — the user must provide a value").
     "gmpe"        name of another GMPE (editable combo box)
     "list_float"  comma-separated floats  -> list of floats
     "list_str"    comma-separated tokens  -> list of strings
+    "int_list"    comma-separated ints / ranges ("1,2,3" or "1-5") -> list
+                  of ints; one GMPE instance (curve) is computed per value
     "kwargs_json" a JSON object merged as **kwargs into the constructor
     ("a","b",…)   one of these fixed choices (combo box)
 
@@ -32,13 +34,16 @@ Derived from the OpenQuake engine 3.26.2 sources.
 GMPE_CTOR_ARGS = {
     # ── Douglas et al. (2024), UK: branch selection ────────────────────
     #   1..162 (full model), 1..5 (5-branch model), 1..3 (3-branch model).
-    #   The Rrup base class defaults to branch=1; the other variants have
-    #   no default in OpenQuake, so 1 is pre-filled here.
-    "Douglas_Et_Al_2024Rjb":          [("branch", "1", "int")],
-    "Douglas_Et_Al_2024Rjb_5branch":  [("branch", "1", "int")],
-    "Douglas_Et_Al_2024Rjb_3branch":  [("branch", "1", "int")],
-    "Douglas_Et_Al_2024Rrup_5branch": [("branch", "1", "int")],
-    "Douglas_Et_Al_2024Rrup_3branch": [("branch", "1", "int")],
+    #   Several values can be given (comma-separated or a range, e.g.
+    #   "1,2,3" or "1-5"): one curve is plotted per branch. The 3-/5-branch
+    #   models default to all their branches; the 162-branch models default
+    #   to branch 1 (like the OpenQuake default of the Rrup class).
+    "Douglas_Et_Al_2024Rjb":          [("branch", "1", "int_list")],
+    "Douglas_Et_Al_2024Rjb_5branch":  [("branch", "1,2,3,4,5", "int_list")],
+    "Douglas_Et_Al_2024Rjb_3branch":  [("branch", "1,2,3", "int_list")],
+    "Douglas_Et_Al_2024Rrup":         [("branch", "1", "int_list")],
+    "Douglas_Et_Al_2024Rrup_5branch": [("branch", "1,2,3,4,5", "int_list")],
+    "Douglas_Et_Al_2024Rrup_3branch": [("branch", "1,2,3", "int_list")],
 
     # ── Canada SHM6, stable crust ──────────────────────────────────────
     #   AA13 model: submodel is low / central / high.
@@ -122,4 +127,35 @@ GMPE_CTOR_ARGS = {
                      "kwargs_json")],
     "ModifiableGMPE": [("*", '{"gmpe": {"BooreEtAl2014": {}}}',
                         "kwargs_json")],
+}
+
+
+# ── Allowed ranges / expected values ─────────────────────────────────────
+# Shown in the GUI next to the input field of each argument. Only entries
+# documented by the OpenQuake implementation are listed here.
+GMPE_ARG_HINTS = {
+    # Douglas et al. (2024): branch ranges depend on the model
+    "Douglas_Et_Al_2024Rjb":          {"branch": "1\u2013162"},
+    "Douglas_Et_Al_2024Rjb_5branch":  {"branch": "1\u20135"},
+    "Douglas_Et_Al_2024Rjb_3branch":  {"branch": "1\u20133"},
+    "Douglas_Et_Al_2024Rrup":         {"branch": "1\u2013162"},
+    "Douglas_Et_Al_2024Rrup_5branch": {"branch": "1\u20135"},
+    "Douglas_Et_Al_2024Rrup_3branch": {"branch": "1\u20133"},
+
+    # NSHMP2014: sign of the adjustment
+    "NSHMP2014": {"sgn": "\u22121 = Lower, 0 = Mean, +1 = Upper"},
+
+    # Coefficient table / grid file locations
+    "NGAEastGMPE":           {"gmpe_table": "file in OQ gsim/nga_east_tables/"},
+    "NGAEastGMPETotalSigma": {"gmpe_table": "file in OQ gsim/nga_east_tables/"},
+    "NGAEastUSGSGMPE":       {"gmpe_table": "file in OQ gsim/usgs_nga_east_tables/"},
+    "NGAEastAUS2023GMPE":    {"table_relpath": "file in OQ gsim/aus23/"},
+    "NBCC2015_AA13":         {"gmpe_table": "file in OQ gsim/can15/nbcc2015_tables/"},
+    "GMPETable":             {"gmpe_table": "path to your coefficient .hdf5"},
+    "GridAdjustedGMPE":      {"grid_hdf5_file": "path to your grid .hdf5"},
+
+    # Units from the class docstrings
+    "HassaniAtkinson2018": {"d_sigma": "stress drop [bar]",
+                            "kappa0": "kappa0 [s]"},
+    "GenericGmpeAvgSA":    {"avg_periods": "periods [s], e.g. 0.5, 1.0"},
 }
