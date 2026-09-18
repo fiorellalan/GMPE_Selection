@@ -19,6 +19,11 @@ import tkinter as tk
 from datetime import datetime
 from tkinter import ttk, messagebox, filedialog
 
+try:
+    from gmpe_args import GMPE_CTOR_ARGS
+except ImportError:  # keep the GUI usable if the file is missing
+    GMPE_CTOR_ARGS = {}
+
 
 # ── Constants ─────────────────────────────────────────────────
 DEFAULT_CATALOGUE = "gmpe_catalogue.csv"
@@ -996,23 +1001,29 @@ def _ensure_catalogue(catalogue_path):
         _helper.write("    return s[:1997]+'...' if len(s)>2000 else s\n\n")
         _helper.write("rows=[]\n")
         _helper.write("for key,cls in sorted(gsim.get_available_gsims().items(),key=lambda x:x[0]):\n")
+        _helper.write("    desc=_desc(cls)\n")
+        _helper.write("    sc=_mc(key)\n")
+        _helper.write("    m=re.search(r'(\\d{4})',key)\n")
+        _helper.write("    yr=int(m.group(1)) if m else 0\n")
+        _helper.write("    if not yr:  # e.g. BA08SiteTerm: year from docstring\n")
+        _helper.write("        m=re.search(r'(\\d{4})',desc)\n")
+        _helper.write("        yr=int(m.group(1)) if m else 0\n")
         _helper.write("    try:\n")
         _helper.write("        inst=cls()\n")
-        _helper.write("        m=re.search(r'(\\d{4})',key)\n")
-        _helper.write("        yr=int(m.group(1)) if m else 0\n")
+        _helper.write("    except Exception:\n")
+        _helper.write("        inst=cls  # e.g. Douglas 2024 needs 'branch'\n")
+        _helper.write("    try:\n")
         _helper.write("        reg=inst.DEFINED_FOR_TECTONIC_REGION_TYPE\n")
-        _helper.write("        rs=reg.value if reg else '\\u2014'\n")
+        _helper.write("        rs=reg.value if hasattr(reg,'value') else (str(reg) if reg else '\\u2014')\n")
         _helper.write("        imts=inst.DEFINED_FOR_INTENSITY_MEASURE_TYPES\n")
         _helper.write("        imt_str=' '.join(sorted(i.__name__.upper() for i in imts)) if imts else ''\n")
-        _helper.write("        stds_tmp=inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES\n")
-        _helper.write("        std_str=' '.join(sorted(stds_tmp)) if stds_tmp else ''\n")
+        _helper.write("        stds=inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES\n")
+        _helper.write("        std_str=' '.join(sorted(stds)) if stds else ''\n")
         _helper.write("        dists=' '.join(sorted(inst.REQUIRES_DISTANCES))\n")
         _helper.write("        rupts=' '.join(sorted(inst.REQUIRES_RUPTURE_PARAMETERS))\n")
         _helper.write("        sites=' '.join(sorted(inst.REQUIRES_SITES_PARAMETERS))\n")
-        _helper.write("        sc=_mc(key)\n")
-        _helper.write("        desc=_desc(cls)\n")
         _helper.write("    except Exception:\n")
-        _helper.write("        yr,rs,imt_str,std_str,dists,rupts,sites,sc,desc=0,'\\u2014','','','','','','',''\n")
+        _helper.write("        dists=rupts=sites=imt_str=std_str=''; rs='\\u2014'\n")
         _helper.write("    rows.append((key,yr,rs,dists,rupts,sites,imt_str,std_str,sc,desc))\n")
         _helper.write("_CAT = %r\n" % catalogue_path)
         _helper.write("with open(_CAT,'w',newline='') as f:\n")
@@ -1051,35 +1062,46 @@ def _ensure_catalogue(catalogue_path):
 
     rows = []
     for key, cls in sorted_items:
+        # Docstring (first paragraph) → user-friendly description
+        doc = (cls.__doc__ or "").strip()
+        para = doc.split("\n\n")[0] if "\n\n" in doc else doc
+        lines = [l.strip() for l in para.split("\n") if l.strip()]
+        description = " ".join(lines).replace("\t", " ")
+        if len(description) > 2000:
+            description = description[:1997] + "..."
+        shortcut = make_gmpe_code(key)
+        # Year: usually in the class name; otherwise (e.g. BA08SiteTerm)
+        # take the first year of the docstring's first paragraph
+        m = _year_re.search(key)
+        year = int(m.group(1)) if m else 0
+        if not year:
+            m = _year_re.search(description)
+            year = int(m.group(1)) if m else 0
+        # Some GMPEs need constructor arguments (e.g. Douglas 2024 'branch')
+        # and cannot be instantiated here: use their class-level attributes
+        # instead of blanking the whole row.
         try:
             inst = cls()
-            m = _year_re.search(key)
-            year = int(m.group(1)) if m else 0
+        except Exception:
+            inst = cls
+        try:
             dists = inst.REQUIRES_DISTANCES
             rupt  = inst.REQUIRES_RUPTURE_PARAMETERS
             sites = inst.REQUIRES_SITES_PARAMETERS
             region = inst.DEFINED_FOR_TECTONIC_REGION_TYPE
-            region_str = region.value if region else "—"
+            if hasattr(region, "value"):
+                region_str = region.value
+            else:
+                region_str = str(region) if region else "—"
             imts = inst.DEFINED_FOR_INTENSITY_MEASURE_TYPES
             imt_str = " ".join(sorted(imt.__name__.upper() for imt in imts)) if imts else ""
             stds = inst.DEFINED_FOR_STANDARD_DEVIATION_TYPES
             std_str = " ".join(sorted(stds)) if stds else ""
-            shortcut = make_gmpe_code(key)
-            # Extract docstring (first paragraph) for user-friendly description
-            doc = (cls.__doc__ or "").strip()
-            para = doc.split("\n\n")[0] if "\n\n" in doc else doc
-            lines = [l.strip() for l in para.split("\n") if l.strip()]
-            description = " ".join(lines).replace("\t", " ")
-            if len(description) > 2000:
-                description = description[:1997] + "..."
         except Exception:
-            year = 0
             dists, rupt, sites = set(), set(), set()
-            region_str = "—"
             imt_str = ""
             std_str = ""
-            shortcut = ""
-            description = ""
+            region_str = "—"
         rows.append((key, year, region_str, dists, rupt, sites, imt_str, std_str, shortcut, description))
 
     import csv as _csv
@@ -2635,12 +2657,19 @@ class GMPESelectionGUI:
         sel_names = self.selection.get(event, set())
         gmpe_list = sorted(sel_names) if sel_names else ["AbrahamsonEtAl2014"]
 
-        # Collect the union of all required parameters across selected GMPEs
+        # Collect the union of all required parameters across selected GMPEs.
+        # Re-read the catalogue file so metadata regenerated on disk (e.g. the
+        # distances required by the Douglas 2024 branches) is picked up
+        # without restarting the app.
+        try:
+            _cat_by_name = {r["GMPE"]: r for r in load_catalogue(self.catalogue_path)}
+        except Exception:
+            _cat_by_name = {r["GMPE"]: r for r in self.catalogue}
         _req_dist = set()
         _req_rupt = set()
         _req_site = set()
         for gname in gmpe_list:
-            row = next((r for r in self.catalogue if r["GMPE"] == gname), None)
+            row = _cat_by_name.get(gname)
             if row:
                 _req_dist.update(row["RequiresDistances"])
                 _req_rupt.update(row["RequiresRupture"])
@@ -2737,6 +2766,60 @@ class GMPESelectionGUI:
                 _bg = "#fecaca" if _is_required else "#ffffff"
                 _ent.configure(bg=_bg)
                 _all_entries[key] = (_ent, _var)
+
+        # ── Extra constructor arguments required by some GMPEs ──
+        # e.g. Douglas 2024 'branch', Canada 'submodel', wrappers'
+        # 'gmpe_name', coefficient-table file names (see gmpe_args.py).
+        _extra_vars = {}          # (gmpe, arg, kind) → tk.StringVar
+        _extra_spec = []
+        for _gname in gmpe_list:
+            for _arg, _default, _kind in GMPE_CTOR_ARGS.get(_gname, ()):
+                _extra_spec.append((_gname, _arg, _default, _kind))
+        if _extra_spec:
+            _extra_frame = ttk.LabelFrame(dialog,
+                                          text=" GMPE Constructor Arguments ",
+                                          padding="6")
+            _extra_frame.pack(fill=tk.X, padx=10, pady=4)
+            _cv = tk.Canvas(_extra_frame, height=min(150, 26 * len(_extra_spec)),
+                            highlightthickness=0, bg=COLORS["bg"])
+            _sb = ttk.Scrollbar(_extra_frame, orient="vertical", command=_cv.yview)
+            _cv.configure(yscrollcommand=_sb.set)
+            _sb.pack(side=tk.RIGHT, fill=tk.Y)
+            _cv.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            _inner = ttk.Frame(_cv)
+            _cv.create_window((0, 0), window=_inner, anchor="nw")
+            _inner.bind("<Configure>",
+                        lambda e: _cv.configure(scrollregion=_cv.bbox("all")))
+            _gmpe_choices = sorted({r["GMPE"] for r in self.catalogue})
+            for _gname, _arg, _default, _kind in _extra_spec:
+                _row = ttk.Frame(_inner)
+                _row.pack(fill=tk.X, pady=1)
+                _txt = _gname + "  →  " + (
+                    "kwargs (JSON)" if _arg == "*" else _arg) + ":"
+                ttk.Label(_row, text=_txt,
+                          font=("Helvetica", 9)).pack(side=tk.LEFT)
+                _var = tk.StringVar(value=_default)
+                if _kind == "gmpe":
+                    _wdg = ttk.Combobox(_row, textvariable=_var,
+                                        values=_gmpe_choices, width=26,
+                                        font=("Helvetica", 9))
+                elif isinstance(_kind, tuple):
+                    _wdg = ttk.Combobox(_row, textvariable=_var,
+                                        values=list(_kind), state="readonly",
+                                        width=26, font=("Helvetica", 9))
+                else:
+                    _wdg = tk.Entry(_row, textvariable=_var, width=28,
+                                    font=("Helvetica", 9),
+                                    relief=tk.SUNKEN, bd=1)
+                    if not _default:
+                        _wdg.configure(bg="#fecaca")  # required, no default
+                _wdg.pack(side=tk.LEFT, padx=4)
+                _extra_vars[(_gname, _arg, _kind)] = _var
+            ttk.Label(_inner,
+                      text="Pre-filled where OpenQuake defines a default — "
+                           "red = value required.",
+                      font=("Helvetica", 8),
+                      foreground="#666").pack(anchor=tk.W, pady=(2, 0))
 
         # ── GMPE count info ──
         gmpe_info = ttk.Label(dialog,
@@ -2875,6 +2958,37 @@ class GMPESelectionGUI:
             if p is None:
                 return
 
+            # ── Collect extra GMPE constructor arguments ──
+            gmpe_args = {}
+            for (_gname, _arg, _kind), _var in _extra_vars.items():
+                _raw = _var.get().strip()
+                if _raw == "":
+                    continue
+                try:
+                    if _kind == "int":
+                        _val = int(_raw)
+                    elif _kind == "float":
+                        _val = float(_raw)
+                    elif _kind == "list_float":
+                        _val = [float(x) for x in
+                                _raw.replace(";", ",").split(",") if x.strip()]
+                    elif _kind == "list_str":
+                        _val = [x.strip() for x in
+                                _raw.replace(";", ",").split(",") if x.strip()]
+                    elif _kind == "kwargs_json":
+                        _val = json.loads(_raw)
+                        if not isinstance(_val, dict):
+                            raise ValueError("expected a JSON object")
+                        gmpe_args.setdefault(_gname, {}).update(_val)
+                        continue
+                    else:
+                        _val = _raw
+                except Exception as _err:
+                    err_var.set(f"Invalid value for {_gname} · {_arg}: "
+                                f"{_raw!r} ({_err})")
+                    return
+                gmpe_args.setdefault(_gname, {})[_arg] = _val
+
             err_var.set("")
             self.status_var.set(f"📊 Computing {len(gmpe_list)} GMPEs via OQ environment…")
             self.root.update()
@@ -2919,6 +3033,7 @@ import gmpe
 tool = gmpe.gmmtools()
 freq = np.array({freq.tolist()})
 gmpe_list = {json.dumps(gmpe_list)}
+gmpe_args = {json.dumps(gmpe_args)}
 result = tool.compute_batch(
     gmpe_list, freq,
     mag={p["mag"]}, depth={p["dep"]}, epi={p["epi"]}, vs30={p["Vs30"]},
@@ -2929,6 +3044,7 @@ result = tool.compute_batch(
     clat={p.get('clat')}, clon={p.get('clon')}, azimuth={p.get('azimuth')},
     vs30measured={p.get('vs30measured')}, z1pt4={p.get('z1pt4')},
     backarc={p.get('backarc')},
+    gmpe_args=gmpe_args,
 )
 try:
     out = json.dumps(result)

@@ -139,7 +139,7 @@ class gmmtools:
         return np.array(sorted(periods))
 
 
-    def computegmpe(self, gmpe, freq, mag, depth, Epi, vs30, **kwargs):
+    def computegmpe(self, gmpe, freq, mag, depth, Epi, vs30, gmpe_args=None, **kwargs):
         from openquake.hazardlib import gsim, imt
 
         """
@@ -205,26 +205,31 @@ class gmmtools:
 
         AVAILABLE_GSIMS = gsim.get_available_gsims()
         gmpe_cls = AVAILABLE_GSIMS[gmpe]
+        # Extra constructor arguments for this GMPE supplied by the caller
+        # (the GUI), e.g. {'Douglas_Et_Al_2024Rjb_3branch': {'branch': 2}}.
+        # Empty values are treated as "not provided".
+        ctor_kwargs = {k: v for k, v in
+                       ((gmpe_args or {}).get(gmpe) or {}).items()
+                       if v != '' and v is not None}
         try:
-            gmpe_inst = gmpe_cls()
+            gmpe_inst = gmpe_cls(**ctor_kwargs)
         except TypeError:
             # Some GMPEs need constructor arguments, e.g. the Douglas et al.
             # (2024) branch variants require 'branch' (no default). Supply
-            # safe defaults for required arguments: branch=1 mirrors the
-            # OpenQuake default of the non-branch-specific Rrup class.
+            # safe defaults for any still-missing required argument:
+            # branch=1 mirrors the OpenQuake default of the Rrup class.
             import inspect
-            init_kwargs = {}
             for pname, par in inspect.signature(gmpe_cls.__init__).parameters.items():
                 if pname == 'self' or par.kind in (
                         inspect.Parameter.VAR_POSITIONAL,
                         inspect.Parameter.VAR_KEYWORD):
                     continue
-                if par.default is inspect.Parameter.empty:
+                if par.default is inspect.Parameter.empty and pname not in ctor_kwargs:
                     if 'branch' in pname.lower():
-                        init_kwargs[pname] = 1
+                        ctor_kwargs[pname] = 1
                     else:
                         raise
-            gmpe_inst = gmpe_cls(**init_kwargs)
+            gmpe_inst = gmpe_cls(**ctor_kwargs)
 
         # Use the GMPE's native periods (its COEFFS table) for computation,
         # then interpolate to the user's frequency grid.
@@ -248,7 +253,9 @@ class gmmtools:
 
         pardist = gmpe_inst.REQUIRES_DISTANCES
         parzone = gmpe_inst.DEFINED_FOR_TECTONIC_REGION_TYPE
-        zone = parzone.value
+        # TRT can be a const.TRT enum or a plain string (e.g. AvgGMPE,
+        # NBCC2015_AA13)
+        zone = parzone.value if hasattr(parzone, 'value') else str(parzone)
 
         rctx = self.read_gmpeinput()
         from openquake.hazardlib.contexts import ContextMaker
@@ -320,7 +327,8 @@ class gmmtools:
                       width=None, z1pt0=None, z2pt5=None,
                       repi=None, rvolc=None, rcdpp=None,
                       clat=None, clon=None, azimuth=None,
-                      vs30measured=None, z1pt4=None, backarc=None):
+                      vs30measured=None, z1pt4=None, backarc=None,
+                      gmpe_args=None):
         """Compute multiple GMPEs and return JSON-serializable dict.
 
         Parameters
@@ -338,6 +346,8 @@ class gmmtools:
         vs30measured : float or None — measured Vs30 flag (default 0)
         z1pt4 : float or None — depth to 1.4 km/s (km)
         backarc : float or None — back-arc flag (0/1)
+        gmpe_args : dict or None — per-GMPE constructor arguments, e.g.
+            {"Douglas_Et_Al_2024Rjb_3branch": {"branch": 1}}
 
         Returns
         -------
@@ -378,6 +388,7 @@ class gmmtools:
                     clat=clat, clon=clon, azimuth=azimuth,
                     vs30measured=vs30measured, z1pt4=z1pt4,
                     backarc=backarc,
+                    gmpe_args=gmpe_args,
                 )
                 results[gname] = [mean.tolist(), sig1m.tolist(), sig1p.tolist(),
                                   nat_freq]
